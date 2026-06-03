@@ -162,6 +162,7 @@ export default function PaymentsPage() {
             </table>
           </div>
         )}
+      </div>
     </div>
   );
 }
