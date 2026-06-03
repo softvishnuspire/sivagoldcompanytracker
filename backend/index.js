@@ -1,11 +1,336 @@
+require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
+const crypto = require('crypto');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Enable CORS for frontend requests
+app.use(cors());
 app.use(express.json());
 
+// Initialize Supabase Client
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('WARNING: Supabase URL or Anon Key is missing in backend/.env');
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Health Check Endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend is running smoothly' });
+  res.json({ status: 'ok', message: 'Backend is running smoothly', dbConnected: !!supabaseUrl });
+});
+
+// 1. GET /api/leads - Fetch all leads with nested relationships
+app.get('/api/leads', async (req, res) => {
+  try {
+    const { data: dbLeads, error } = await supabase
+      .from('leads')
+      .select(`
+        *,
+        documents:lead_documents(*),
+        interactions:customer_interactions(*),
+        timeline:lead_timeline(*)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json(dbLeads || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// 2. POST /api/leads - Create a new lead
+app.post('/api/leads', async (req, res) => {
+  try {
+    const {
+      customer_name,
+      mobile,
+      alternate_mobile,
+      address,
+      district,
+      gold_weight,
+      gold_type,
+      estimated_value,
+      bank_name,
+      branch_name,
+      loan_amount,
+      loan_account_number,
+      current_status,
+      telecaller_id,
+      documents
+    } = req.body;
+
+    const leadId = crypto.randomUUID();
+    
+    // Fetch count or generate a unique lead number
+    const { count, error: countError } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      return res.status(400).json({ error: countError.message });
+    }
+
+    const nextNum = (count || 0) + 1;
+    const lead_number = `SGL-2026-${nextNum.toString().padStart(4, '0')}`;
+
+    // Insert lead
+    const { data: leadData, error: leadError } = await supabase
+      .from('leads')
+      .insert({
+        id: leadId,
+        lead_number,
+        customer_name,
+        mobile,
+        alternate_mobile,
+        address,
+        district,
+        gold_weight: Number(gold_weight || 0),
+        gold_type,
+        estimated_value: Number(estimated_value || 0),
+        bank_name,
+        branch_name,
+        loan_amount: Number(loan_amount || 0),
+        loan_account_number,
+        current_status: current_status || 'CUSTOMER_DETAILS_CREATED',
+        telecaller_id
+      })
+      .select()
+      .single();
+
+    if (leadError) {
+      return res.status(400).json({ error: leadError.message });
+    }
+
+    // Insert initial timeline entry
+    await supabase.from('lead_timeline').insert({
+      lead_id: leadId,
+      status: current_status || 'CUSTOMER_DETAILS_CREATED',
+      remarks: 'Lead created in systems directory',
+      updated_by: telecaller_id
+    });
+
+    // Insert documents if provided
+    if (documents && Array.isArray(documents) && documents.length > 0) {
+      const dbDocs = documents.map(d => ({
+        id: crypto.randomUUID(),
+        lead_id: leadId,
+        document_type: d.documentType,
+        file_url: d.fileUrl || '#',
+        uploaded_by: telecaller_id
+      }));
+      await supabase.from('lead_documents').insert(dbDocs);
+    }
+
+    res.status(201).json(leadData);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// 3. PUT /api/leads/:id - Update lead details
+app.put('/api/leads/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      customer_name,
+      mobile,
+      alternate_mobile,
+      address,
+      district,
+      gold_weight,
+      gold_type,
+      estimated_value,
+      bank_name,
+      branch_name,
+      loan_amount,
+      loan_account_number,
+      current_status,
+      telecaller_id
+    } = req.body;
+
+    const { data: leadData, error: updateError } = await supabase
+      .from('leads')
+      .update({
+        customer_name,
+        mobile,
+        alternate_mobile,
+        address,
+        district,
+        gold_weight: Number(gold_weight || 0),
+        gold_type,
+        estimated_value: Number(estimated_value || 0),
+        bank_name,
+        branch_name,
+        loan_amount: Number(loan_amount || 0),
+        loan_account_number,
+        current_status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(400).json({ error: updateError.message });
+    }
+
+    // Add timeline entry
+    await supabase.from('lead_timeline').insert({
+      lead_id: id,
+      status: current_status,
+      remarks: 'Lead details modified by Telecaller',
+      updated_by: telecaller_id
+    });
+
+    res.json(leadData);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// 4. PATCH /api/leads/:id/status - Update lead status
+app.patch('/api/leads/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { current_status, remarks, telecaller_id } = req.body;
+
+    const { data: leadData, error: updateError } = await supabase
+      .from('leads')
+      .update({
+        current_status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(400).json({ error: updateError.message });
+    }
+
+    // Add timeline log
+    await supabase.from('lead_timeline').insert({
+      lead_id: id,
+      status: current_status,
+      remarks: remarks || `Status updated to ${current_status}`,
+      updated_by: telecaller_id
+    });
+
+    res.json(leadData);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// 5. POST /api/leads/:id/followups - Schedule a follow-up
+app.post('/api/leads/:id/followups', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, remarks, telecaller_id } = req.body;
+
+    // Add customer interaction log
+    const { error: interactionError } = await supabase
+      .from('customer_interactions')
+      .insert({
+        id: crypto.randomUUID(),
+        lead_id: id,
+        employee_id: telecaller_id,
+        interaction_type: 'FOLLOWUP',
+        notes: `Followup Date: ${date} - ${remarks}`
+      });
+
+    if (interactionError) {
+      return res.status(400).json({ error: interactionError.message });
+    }
+
+    // Update lead status to FOLLOW-UP
+    const { data: leadData, error: updateError } = await supabase
+      .from('leads')
+      .update({
+        current_status: 'FOLLOW-UP',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(400).json({ error: updateError.message });
+    }
+
+    // Add timeline log
+    await supabase.from('lead_timeline').insert({
+      lead_id: id,
+      status: 'FOLLOW-UP',
+      remarks: `Follow-up scheduled: ${remarks}`,
+      updated_by: telecaller_id
+    });
+
+    res.json(leadData);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// 6. PATCH /api/leads/:id/followups/:followupId/complete - Complete a follow-up
+app.patch('/api/leads/:id/followups/:followupId/complete', async (req, res) => {
+  try {
+    const { id, followupId } = req.params;
+    const { remarks, telecaller_id } = req.body;
+
+    // Add completed interaction log
+    const { error: interactionError } = await supabase
+      .from('customer_interactions')
+      .insert({
+        id: crypto.randomUUID(),
+        lead_id: id,
+        employee_id: telecaller_id,
+        interaction_type: 'CALL',
+        notes: `Completed followup call: ${remarks}`
+      });
+
+    if (interactionError) {
+      return res.status(400).json({ error: interactionError.message });
+    }
+
+    // Update lead status back to CUSTOMER_DETAILS_CREATED (or status of choice)
+    const { data: leadData, error: updateError } = await supabase
+      .from('leads')
+      .update({
+        current_status: 'CUSTOMER_DETAILS_CREATED',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(400).json({ error: updateError.message });
+    }
+
+    // Add timeline log
+    await supabase.from('lead_timeline').insert({
+      lead_id: id,
+      status: 'CUSTOMER_DETAILS_CREATED',
+      remarks: `Completed followup call log: ${remarks}`,
+      updated_by: telecaller_id
+    });
+
+    res.json(leadData);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
 });
 
 app.listen(PORT, () => {

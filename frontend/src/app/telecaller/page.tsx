@@ -15,22 +15,24 @@ import {
   Menu,
   X,
   Phone,
-  Coins
+  Coins,
+  Clock
 } from 'lucide-react';
 import { Lead, LeadStatus, DashboardStats, Followup } from './types';
 import { INITIAL_LEADS } from './mockData';
-import { supabase } from '../../lib/supabaseClient';
-
 // Import components
 import StatsOverview from './components/StatsOverview';
 import LeadForm from './components/LeadForm';
 import LeadList from './components/LeadList';
 import FollowupList from './components/FollowupList';
 import ReportsView from './components/ReportsView';
+import PendingFollowupsList from './components/PendingFollowupsList';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function TelecallerDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'pending-followups' | 'reports'>('dashboard');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -96,19 +98,11 @@ export default function TelecallerDashboard() {
   // Fetch leads from database
   const fetchLeads = async () => {
     try {
-      const { data: dbLeads, error } = await supabase
-        .from('leads')
-        .select(`
-          *,
-          documents:lead_documents(*),
-          interactions:customer_interactions(*),
-          timeline:lead_timeline(*)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
+      const response = await fetch(`${API_BASE}/leads`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch leads from backend API');
       }
+      const dbLeads = await response.json();
 
       if (dbLeads) {
         const mapped = dbLeads.map(mapDbToLead);
@@ -116,7 +110,7 @@ export default function TelecallerDashboard() {
         setDbConnected(true);
       }
     } catch (err) {
-      console.warn('Supabase fetch leads failed. Falling back to local storage/mock data.', err);
+      console.warn('Backend fetch leads failed. Falling back to local storage/mock data.', err);
       setDbConnected(false);
       
       // Fallback local storage
@@ -178,9 +172,12 @@ export default function TelecallerDashboard() {
       try {
         if (formData.id) {
           // 1. Editing mode
-          const { error: updateError } = await supabase
-            .from('leads')
-            .update({
+          const response = await fetch(`${API_BASE}/leads/${formData.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
               customer_name: formData.customerName,
               mobile: formData.mobile,
               alternate_mobile: formData.alternateMobile,
@@ -194,31 +191,22 @@ export default function TelecallerDashboard() {
               loan_account_number: formData.loanAccountNumber,
               loan_amount: formData.loanAmount,
               current_status: formData.status,
-              updated_at: new Date().toISOString()
+              telecaller_id: telecallerId
             })
-            .eq('id', formData.id);
-
-          if (updateError) throw updateError;
-
-          // Add timeline entry
-          await supabase.from('lead_timeline').insert({
-            lead_id: formData.id,
-            status: formData.status,
-            remarks: 'Lead details modified by Telecaller',
-            updated_by: telecallerId
           });
 
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Failed to update lead');
+          }
         } else {
           // 2. Creation mode
-          const leadId = crypto.randomUUID();
-          const nextNum = leads.length + 1;
-          const leadNumber = `SGL-2026-${nextNum.toString().padStart(4, '0')}`;
-
-          const { error: insertError } = await supabase
-            .from('leads')
-            .insert({
-              id: leadId,
-              lead_number: leadNumber,
+          const response = await fetch(`${API_BASE}/leads`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
               customer_name: formData.customerName,
               mobile: formData.mobile,
               alternate_mobile: formData.alternateMobile,
@@ -231,31 +219,16 @@ export default function TelecallerDashboard() {
               branch_name: formData.branchName,
               loan_account_number: formData.loanAccountNumber,
               loan_amount: formData.loanAmount,
+              current_status: 'CUSTOMER_DETAILS_CREATED',
               telecaller_id: telecallerId,
-              current_status: 'CUSTOMER_DETAILS_CREATED'
-            });
-
-          if (insertError) throw insertError;
-
-          // Insert documents
-          if (formData.documents && formData.documents.length > 0) {
-            const dbDocs = formData.documents.map(d => ({
-              id: crypto.randomUUID(),
-              lead_id: leadId,
-              document_type: d.documentType,
-              file_url: d.fileUrl || '#',
-              uploaded_by: telecallerId
-            }));
-            await supabase.from('lead_documents').insert(dbDocs);
-          }
-
-          // Insert initial timeline entry
-          await supabase.from('lead_timeline').insert({
-            lead_id: leadId,
-            status: 'CUSTOMER_DETAILS_CREATED',
-            remarks: 'Lead created in systems directory',
-            updated_by: telecallerId
+              documents: formData.documents
+            })
           });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Failed to create lead');
+          }
         }
 
         // Refresh leads
@@ -306,23 +279,22 @@ export default function TelecallerDashboard() {
 
     if (dbConnected) {
       try {
-        const { error: updateError } = await supabase
-          .from('leads')
-          .update({
+        const response = await fetch(`${API_BASE}/leads/${leadId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
             current_status: status,
-            updated_at: new Date().toISOString()
+            remarks: remarks || `Status updated to ${status}`,
+            telecaller_id: telecallerId
           })
-          .eq('id', leadId);
-
-        if (updateError) throw updateError;
-
-        // Add timeline logs
-        await supabase.from('lead_timeline').insert({
-          lead_id: leadId,
-          status,
-          remarks: remarks || `Status updated to ${status}`,
-          updated_by: telecallerId
         });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to update status');
+        }
 
         await fetchLeads();
         return;
@@ -350,35 +322,22 @@ export default function TelecallerDashboard() {
 
     if (dbConnected) {
       try {
-        // Add customer interaction log
-        const { error: interactionError } = await supabase
-          .from('customer_interactions')
-          .insert({
-            id: crypto.randomUUID(),
-            lead_id: leadId,
-            employee_id: telecallerId,
-            interaction_type: 'FOLLOWUP',
-            notes: `Followup Date: ${date} - ${remarks}`
-          });
-
-        if (interactionError) throw interactionError;
-
-        // Update lead status to FOLLOW-UP
-        await supabase
-          .from('leads')
-          .update({
-            current_status: 'FOLLOW-UP',
-            updated_at: new Date().toISOString()
+        const response = await fetch(`${API_BASE}/leads/${leadId}/followups`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            date,
+            remarks,
+            telecaller_id: telecallerId
           })
-          .eq('id', leadId);
-
-        // Add timeline log
-        await supabase.from('lead_timeline').insert({
-          lead_id: leadId,
-          status: 'FOLLOW-UP',
-          remarks: `Follow-up scheduled: ${remarks}`,
-          updated_by: telecallerId
         });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to add followup');
+        }
 
         await fetchLeads();
         return;
@@ -417,34 +376,21 @@ export default function TelecallerDashboard() {
 
     if (dbConnected) {
       try {
-        // Add completed interaction log
-        await supabase
-          .from('customer_interactions')
-          .insert({
-            id: crypto.randomUUID(),
-            lead_id: leadId,
-            employee_id: telecallerId,
-            interaction_type: 'CALL',
-            notes: `Completed followup call: ${remarks}`
-          });
-
-        // Delete/resolve the pending followup if using interactions (here we just log completion)
-        // Set lead status back to details created or check for other followups
-        await supabase
-          .from('leads')
-          .update({
-            current_status: 'CUSTOMER_DETAILS_CREATED',
-            updated_at: new Date().toISOString()
+        const response = await fetch(`${API_BASE}/leads/${leadId}/followups/${followupId}/complete`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            remarks,
+            telecaller_id: telecallerId
           })
-          .eq('id', leadId);
-
-        // Add timeline log
-        await supabase.from('lead_timeline').insert({
-          lead_id: leadId,
-          status: 'CUSTOMER_DETAILS_CREATED',
-          remarks: `Completed followup call log: ${remarks}`,
-          updated_by: telecallerId
         });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to complete followup');
+        }
 
         await fetchLeads();
         return;
@@ -494,6 +440,7 @@ export default function TelecallerDashboard() {
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'leads-list' as const, label: 'Lead Management', icon: ListTodo },
     { id: 'add-lead' as const, label: 'Add Lead', icon: PlusCircle },
+    { id: 'pending-followups' as const, label: 'Pending Followups', icon: Clock },
     { id: 'follow-ups' as const, label: 'Follow-ups', icon: PhoneCall },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 }
   ];
@@ -763,6 +710,15 @@ export default function TelecallerDashboard() {
                   leads={leads}
                   onCompleteFollowup={handleCompleteFollowup}
                   onSimulateCall={triggerCallSimulationFromFollowup}
+                />
+              </div>
+            )}
+
+            {activeTab === 'pending-followups' && (
+              <div className="animate-fadeIn">
+                <PendingFollowupsList
+                  leads={leads}
+                  onEdit={handleEditLeadTrigger}
                 />
               </div>
             )}
