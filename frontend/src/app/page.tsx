@@ -18,7 +18,7 @@ import {
   Check,
   Info
 } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+
 
 type UserRole = 'telecaller' | 'rm' | 'executive' | 'md';
 
@@ -76,65 +76,45 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // 1. Query the users table for the given email, role, and active status
-      const { data: users, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email.trim())
-        .eq('role', role)
-        .eq('status', 'active');
+      // Send login request to secured backend API
+      const res = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password,
+          role: role
+        })
+      });
 
-      if (error) {
-        console.error('Supabase query error:', error);
+      if (!res.ok) {
+        const errorData = await res.json();
+        setNotification(errorData.error || 'Invalid credentials or role mismatch.');
+        setTimeout(() => setNotification(null), 4000);
+        return;
       }
 
-      // 2. Check if a user was found
-      if (users && users.length > 0) {
-        const user = users[0];
-        
-        // Save current user session details
-        localStorage.setItem('siva_user', JSON.stringify({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          employee_code: user.employee_code,
-          branch_id: user.branch_id
-        }));
+      const data = await res.json();
+      
+      // Save current user session details & token
+      localStorage.setItem('siva_token', data.token);
+      localStorage.setItem('siva_user', JSON.stringify(data.user));
 
-        if (role === 'telecaller') {
-          router.push('/telecaller');
-        } else {
-          setNotification(`The ${roleDetails[role].title} workspace is currently under collaborative construction.`);
-          setTimeout(() => setNotification(null), 4000);
-        }
+      if (role === 'telecaller') {
+        router.push('/telecaller');
+      } else if (role === 'rm') {
+        router.push('/rm');
+      } else if (role === 'executive') {
+        router.push('/executive');
+      } else if (role === 'md') {
+        router.push('/md');
       } else {
-        // 3. Fallback: If DB query returned nothing (e.g. database is not seeded yet)
-        // Check for dev-mode mock logins to avoid locking developers out
-        if (email.trim() === 'agent01@sivagold.com' || email.trim().includes('sivagold.com')) {
-          localStorage.setItem('siva_user', JSON.stringify({
-            id: 'mock-uuid-tc-agent-1',
-            name: 'Anil Telecaller',
-            email: email.trim(),
-            role: role,
-            employee_code: 'SGT-TC-01',
-            branch_id: 'mock-branch-vijayawada'
-          }));
-
-          if (role === 'telecaller') {
-            router.push('/telecaller');
-          } else {
-            setNotification(`The ${roleDetails[role].title} workspace is currently under collaborative construction.`);
-            setTimeout(() => setNotification(null), 4000);
-          }
-        } else {
-          setNotification('Invalid credentials or role mismatch. Please verify email and role.');
-          setTimeout(() => setNotification(null), 4000);
-        }
+        setNotification(`Role workspace portal is not registered.`);
+        setTimeout(() => setNotification(null), 4000);
       }
     } catch (err) {
       console.error('Failed to sign in:', err);
-      setNotification('Network error. Proceeding with mock login session.');
+      setNotification('Network error connecting to authentication server.');
       setTimeout(() => setNotification(null), 4000);
     } finally {
       setLoading(false);
@@ -169,9 +149,9 @@ export default function Home() {
         <div className="w-full md:w-5/12 bg-brand-cherry/30 p-8 sm:p-10 flex flex-col justify-between border-b md:border-b-0 md:border-r border-brand-copper/20 relative">
           
           {/* Logo container */}
-          <div className="flex items-center gap-2">
-            <div className="p-2.5 rounded-xl bg-brand-mahogany border border-brand-copper/35 text-brand-silver flex items-center justify-center">
-              <Coins size={18} className="text-brand-silver animate-pulse" />
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="font-extrabold text-sm tracking-tight text-brand-silver uppercase">Shiva Gold</span>
