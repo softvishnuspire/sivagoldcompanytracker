@@ -49,6 +49,12 @@ app.use(cors({
 app.use(express.json({ limit: '200mb' }));
 app.use(express.urlencoded({ limit: '200mb', extended: true }));
 
+// Request Logging Middleware to show server activity
+app.use((req, res, next) => {
+  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // Rate Limiting (limit every endpoint)
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
