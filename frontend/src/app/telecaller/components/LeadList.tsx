@@ -14,7 +14,9 @@ import {
   Loader2, 
   PhoneCall, 
   ChevronRight,
-  Info
+  Info,
+  Trash2,
+  Send
 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 
@@ -23,9 +25,10 @@ interface LeadListProps {
   onEdit: (lead: Lead) => void;
   onUpdateStatus: (leadId: string, status: LeadStatus, remarks?: string) => void;
   onAddFollowup: (leadId: string, date: string, remarks: string) => void;
+  onDelete: (leadId: string) => void;
 }
 
-export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup }: LeadListProps) {
+export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup, onDelete }: LeadListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
@@ -71,20 +74,20 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup 
     setShowCallOutcome(true);
   };
 
-  const handleCallOutcome = (outcome: 'QUALIFIED' | 'REJECTED' | 'FOLLOW-UP') => {
+  const handleCallOutcome = (outcome: 'DETAILS_COLLECTED' | 'RM_REJECTED' | 'FOLLOWUP_IN_PROGRESS') => {
     if (!callingLead) return;
 
-    if (outcome === 'FOLLOW-UP') {
+    if (outcome === 'FOLLOWUP_IN_PROGRESS') {
       if (!followupDate || !followupRemarks) {
         alert('Please enter both followup date and remarks');
         return;
       }
       onAddFollowup(callingLead.id, followupDate, followupRemarks);
-      onUpdateStatus(callingLead.id, 'FOLLOW-UP', followupRemarks);
-    } else if (outcome === 'QUALIFIED') {
-      onUpdateStatus(callingLead.id, 'RM VERIFICATION', 'Qualified by telecaller');
+      onUpdateStatus(callingLead.id, 'FOLLOWUP_IN_PROGRESS', followupRemarks);
+    } else if (outcome === 'DETAILS_COLLECTED') {
+      onUpdateStatus(callingLead.id, 'SENT_TO_RM', 'Qualified by telecaller');
     } else {
-      onUpdateStatus(callingLead.id, 'REJECTED', 'Rejected by telecaller: Customer not interested');
+      onUpdateStatus(callingLead.id, 'RM_REJECTED', 'Rejected by telecaller: Customer not interested');
     }
 
     setCallingLead(null);
@@ -102,29 +105,34 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup 
   // Status Badge Generator
   const getStatusBadge = (status: LeadStatus) => {
     const styles: Record<LeadStatus, string> = {
-      'NEW LEAD': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
       'CUSTOMER_DETAILS_CREATED': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      'FOLLOW-UP': 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-      'QUALIFIED': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      'REJECTED': 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      'RM VERIFICATION': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-      'APPROVED': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-      'EXECUTIVE ASSIGNED': 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-      'CUSTOMER CALLED': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-      'VISIT CONFIRMED': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-      'TRAVEL STARTED': 'bg-pink-500/10 text-pink-400 border-pink-500/20',
-      'REACHED CUSTOMER': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      'BANK VISIT': 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-      'PAYMENT DONE': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      'GOLD RECEIVED': 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-      'BALANCE PAID': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      'IMAGES UPLOADED': 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-      'COMPLETED': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      'FOLLOWUP_IN_PROGRESS': 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+      'DETAILS_COLLECTED': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      'DOCUMENTS_RECEIVED': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+      'PRICE_CONFIRMED': 'bg-lime-500/10 text-lime-400 border-lime-500/20',
+      'SENT_TO_RM': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+      'RM_APPROVED': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+      'RM_REVERIFICATION': 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+      'RM_REJECTED': 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+      'EXECUTIVE_ASSIGNED': 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+      'CUSTOMER_CALLED': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+      'VISIT_CONFIRMED': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+      'MD_FUNDS_APPROVED': 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+      'JOURNEY_STARTED': 'bg-pink-500/10 text-pink-400 border-pink-500/20',
+      'REACHED_CUSTOMER': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      'CUSTOMER_INTERACTION': 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+      'BANK_VISIT': 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+      'AGREEMENT_PENDING': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+      'PAYMENT_COMPLETED': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+      'GOLD_RECEIVED': 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+      'BALANCE_SETTLED': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      'IMAGES_UPLOADED': 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+      'CASE_COMPLETED': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
     };
 
     return (
       <span className={`text-[10px] uppercase font-bold px-2 py-1 border rounded-full tracking-wider ${styles[status] || 'bg-brand-mahogany text-brand-slate'}`}>
-        {status}
+        {status.replace(/_/g, ' ')}
       </span>
     );
   };
@@ -153,11 +161,11 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup 
               className="bg-brand-cherry/40 border border-brand-copper/20 rounded-xl py-2 px-3 text-xs text-brand-silver outline-none focus:border-brand-copper cursor-pointer"
             >
               <option value="ALL">All Statuses</option>
-              <option value="NEW LEAD">New Lead</option>
-              <option value="FOLLOW-UP">Follow-up</option>
-              <option value="RM VERIFICATION">Sent to RM</option>
-              <option value="QUALIFIED">Qualified</option>
-              <option value="REJECTED">Rejected</option>
+              <option value="CUSTOMER_DETAILS_CREATED">New Lead</option>
+              <option value="FOLLOWUP_IN_PROGRESS">Follow-up</option>
+              <option value="SENT_TO_RM">Sent to RM</option>
+              <option value="DETAILS_COLLECTED">Details Collected</option>
+              <option value="RM_REJECTED">Rejected</option>
             </select>
           </div>
 
@@ -235,7 +243,7 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup 
                   </td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex items-center justify-end gap-2.5">
-                      {['NEW LEAD', 'FOLLOW-UP'].includes(lead.status) && (
+                      {['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(lead.status) && (
                         <button
                           onClick={() => startCall(lead)}
                           className="p-2 rounded-xl bg-brand-copper/20 text-brand-silver hover:bg-brand-copper/40 transition-colors border border-brand-copper/35 cursor-pointer"
@@ -244,12 +252,32 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup 
                           <Phone size={15} />
                         </button>
                       )}
+                      {lead.status === 'CUSTOMER_DETAILS_CREATED' && (
+                        <button
+                          onClick={() => onUpdateStatus(lead.id, 'SENT_TO_RM', 'Sent to RM for verification')}
+                          className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/30 transition-colors border border-emerald-500/30 cursor-pointer"
+                          title="Send to RM"
+                        >
+                          <Send size={15} />
+                        </button>
+                      )}
                       <button
                         onClick={() => onEdit(lead)}
                         className="p-2 rounded-xl bg-brand-mahogany text-brand-slate hover:bg-brand-copper/20 hover:text-white transition-colors border border-brand-copper/20 cursor-pointer"
                         title="Edit Lead"
                       >
                         <Edit3 size={15} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Are you sure you want to delete lead ${lead.leadNumber} (${lead.customerName})?`)) {
+                            onDelete(lead.id);
+                          }
+                        }}
+                        className="p-2 rounded-xl bg-brand-mahogany text-rose-400 hover:bg-rose-500/10 hover:text-rose-500 transition-colors border border-brand-copper/20 hover:border-rose-500/30 cursor-pointer"
+                        title="Delete Lead"
+                      >
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </td>
@@ -314,7 +342,7 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup 
                 </span>
                 
                 <div className="flex gap-2">
-                  {['NEW LEAD', 'FOLLOW-UP'].includes(lead.status) && (
+                  {['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(lead.status) && (
                     <button
                       onClick={() => startCall(lead)}
                       className="flex items-center gap-1 py-1.5 px-3 rounded-lg bg-brand-copper/20 text-brand-silver border border-brand-copper/35 text-xs font-semibold hover:bg-brand-copper/40 transition-all cursor-pointer"
@@ -322,11 +350,29 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup 
                       <Phone size={13} /> Call
                     </button>
                   )}
+                  {lead.status === 'CUSTOMER_DETAILS_CREATED' && (
+                    <button
+                      onClick={() => onUpdateStatus(lead.id, 'SENT_TO_RM', 'Sent to RM for verification')}
+                      className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-xs font-semibold hover:bg-emerald-500/30 transition-all cursor-pointer"
+                    >
+                      <Send size={13} /> Send to RM
+                    </button>
+                  )}
                   <button
                     onClick={() => onEdit(lead)}
                     className="flex items-center gap-1 py-1.5 px-3 rounded-lg bg-brand-mahogany text-brand-slate border border-brand-copper/20 text-xs font-semibold hover:bg-brand-copper/20 transition-all cursor-pointer"
                   >
                     <Edit3 size={13} /> Edit
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to delete lead ${lead.leadNumber} (${lead.customerName})?`)) {
+                        onDelete(lead.id);
+                      }
+                    }}
+                    className="flex items-center gap-1 py-1.5 px-3 rounded-lg bg-brand-mahogany text-rose-400 border border-brand-copper/20 text-xs font-semibold hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
+                  >
+                    <Trash2 size={13} /> Delete
                   </button>
                 </div>
               </div>
@@ -394,13 +440,13 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup 
                 
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => handleCallOutcome('QUALIFIED')}
+                    onClick={() => handleCallOutcome('DETAILS_COLLECTED')}
                     className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-bold cursor-pointer"
                   >
                     <Check size={16} /> Interested
                   </button>
                   <button
-                    onClick={() => handleCallOutcome('REJECTED')}
+                    onClick={() => handleCallOutcome('RM_REJECTED')}
                     className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-all text-xs font-bold cursor-pointer"
                   >
                     <X size={16} /> Not Interested
@@ -435,7 +481,7 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup 
 
                   <button
                     type="button"
-                    onClick={() => handleCallOutcome('FOLLOW-UP')}
+                    onClick={() => handleCallOutcome('FOLLOWUP_IN_PROGRESS')}
                     className="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-xs transition-all shadow-lg cursor-pointer"
                   >
                     Set Follow-up

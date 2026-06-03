@@ -11,6 +11,7 @@ import {
   Plus
 } from 'lucide-react';
 import { Lead, Document } from '../types';
+import { supabase } from '../../../lib/supabaseClient';
 
 interface LeadFormProps {
   onSave: (lead: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
@@ -33,13 +34,14 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
     branchName: '',
     loanAmount: '',
     loanAccountNumber: '',
-    status: 'NEW LEAD' as Lead['status']
+    source: '',
+    status: 'CUSTOMER_DETAILS_CREATED' as Lead['status']
   });
 
   const [uploadedFiles, setUploadedFiles] = useState<{
-    LOAN_SLIP?: { name: string; progress: number; done: boolean };
-    KYC?: { name: string; progress: number; done: boolean };
-    ADDITIONAL?: { name: string; progress: number; done: boolean };
+    LOAN_SLIP?: { name: string; progress: number; done: boolean; url?: string };
+    KYC?: { name: string; progress: number; done: boolean; url?: string };
+    ADDITIONAL?: { name: string; progress: number; done: boolean; url?: string };
   }>({});
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -59,6 +61,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         branchName: editingLead.branchName,
         loanAmount: editingLead.loanAmount.toString(),
         loanAccountNumber: editingLead.loanAccountNumber,
+        source: editingLead.source || '',
         status: editingLead.status
       });
 
@@ -68,7 +71,8 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         docs[d.documentType] = {
           name: d.fileName,
           progress: 100,
-          done: true
+          done: true,
+          url: d.fileUrl
         };
       });
       setUploadedFiles(docs);
@@ -87,29 +91,61 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
     }
   };
 
-  const handleFileUploadSimulate = (type: 'LOAN_SLIP' | 'KYC' | 'ADDITIONAL', fileName: string) => {
+  const handleRealFileUpload = async (
+    type: 'LOAN_SLIP' | 'KYC' | 'ADDITIONAL',
+    file: File
+  ) => {
+    // Set initial loading state
     setUploadedFiles(prev => ({
       ...prev,
-      [type]: { name: fileName, progress: 10, done: false }
+      [type]: { name: file.name, progress: 30, done: false }
     }));
 
-    let progress = 10;
-    const interval = setInterval(() => {
-      progress += 30;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const isConfigured = supabaseUrl && supabaseUrl.startsWith('http') && supabaseAnonKey;
+
+    if (isConfigured) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      const filePath = `documents/${fileName}`;
+
+      try {
+        // 1. Try uploading to Supabase Storage
+        const { data, error } = await supabase.storage
+          .from('loan-documents')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true
+          });
+
+        if (error) throw error;
+
+        // 2. Get public url
+        const { data: urlData } = supabase.storage
+          .from('loan-documents')
+          .getPublicUrl(filePath);
+
         setUploadedFiles(prev => ({
           ...prev,
-          [type]: { name: fileName, progress: 100, done: true }
+          [type]: { name: file.name, progress: 100, done: true, url: urlData.publicUrl }
         }));
-      } else {
-        setUploadedFiles(prev => ({
-          ...prev,
-          [type]: { name: fileName, progress, done: false }
-        }));
+        return; // Successful online upload
+      } catch (err) {
+        console.warn('Supabase storage upload failed. Falling back to local Base64 storage.', err);
       }
-    }, 400);
+    }
+
+    // Fallback: Read file as Base64 Data URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64data = reader.result as string;
+      setUploadedFiles(prev => ({
+        ...prev,
+        [type]: { name: file.name, progress: 100, done: true, url: base64data }
+      }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const validateStep = (step: number): boolean => {
@@ -178,7 +214,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
           leadId: editingLead?.id || '',
           documentType: type as Document['documentType'],
           fileName: file.name,
-          fileUrl: '#',
+          fileUrl: file.url || '#',
           uploadedBy: 'TC-01',
           createdAt: new Date().toISOString()
         });
@@ -199,6 +235,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
       branchName: formData.branchName.trim(),
       loanAmount: parseFloat(formData.loanAmount),
       loanAccountNumber: formData.loanAccountNumber.trim(),
+      source: formData.source || undefined,
       status: formData.status,
       telecallerId: editingLead?.telecallerId || 'TC-01',
       rmId: editingLead?.rmId,
@@ -224,7 +261,8 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
       branchName: formData.branchName.trim() || '',
       loanAmount: parseFloat(formData.loanAmount) || 0,
       loanAccountNumber: formData.loanAccountNumber.trim() || '',
-      status: 'FOLLOW-UP',
+      source: formData.source || undefined,
+      status: 'FOLLOWUP_IN_PROGRESS',
       telecallerId: editingLead?.telecallerId || 'TC-01',
       rmId: editingLead?.rmId,
       executiveId: editingLead?.executiveId,
@@ -249,7 +287,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
           {editingLead ? 'Edit Lead' : 'Create New Lead'}
         </h2>
         <button
-          onClick={onCancel}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            onCancel();
+          }}
           className="px-4 py-2 text-sm font-medium text-brand-slate hover:text-brand-silver transition-colors cursor-pointer"
         >
           Cancel
@@ -268,7 +310,8 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
               <div className="flex flex-col items-center gap-1.5 relative">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
                     let valid = true;
                     for (let stepIndex = 1; stepIndex < s.num; stepIndex++) {
                       if (!validateStep(stepIndex)) {
@@ -418,6 +461,26 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                   <AlertCircle size={12} /> {errors.address}
                 </span>
               )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-brand-slate mb-1.5 uppercase">
+                Where Did They Hear About Us?
+              </label>
+              <select
+                name="source"
+                value={formData.source}
+                onChange={handleInputChange}
+                className="w-full bg-brand-cherry/40 border border-brand-copper/20 rounded-xl py-2.5 px-3.5 text-sm text-brand-silver outline-none focus:border-brand-copper focus:ring-1 focus:ring-brand-copper/20"
+              >
+                <option value="">Select source (optional)</option>
+                <option value="Website">Website</option>
+                <option value="Facebook Ads">Facebook Ads</option>
+                <option value="Google Ads">Google Ads</option>
+                <option value="Referrals">Referrals</option>
+                <option value="Direct Calls">Direct Calls</option>
+                <option value="Walk Ins">Walk Ins</option>
+              </select>
             </div>
           </div>
         )}
@@ -590,7 +653,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         {activeStep === 4 && (
           <div className="space-y-6 animate-fadeIn">
             <h3 className="text-sm font-semibold text-brand-slate uppercase tracking-wider">
-              Document Uploads (Mock Simulation)
+              Document Uploads
             </h3>
             
             <div className="space-y-4">
@@ -622,11 +685,15 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                           {file.done && (
                             <button
                               type="button"
-                              onClick={() => setUploadedFiles(prev => {
-                                const copy = { ...prev };
-                                delete copy[docType.type];
-                                return copy;
-                              })}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setUploadedFiles(prev => {
+                                  const copy = { ...prev };
+                                  delete copy[docType.type];
+                                  return copy;
+                                });
+                              }}
                               className="text-xs text-brand-slate hover:text-rose-450 transition-colors cursor-pointer"
                             >
                               Remove
@@ -634,13 +701,19 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                           )}
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleFileUploadSimulate(docType.type, docType.placeholder)}
-                          className="flex items-center gap-1.5 text-xs text-brand-silver bg-brand-mahogany border border-brand-copper/30 hover:bg-brand-copper/20 hover:border-brand-copper transition-all font-medium py-1.5 px-3 rounded-lg cursor-pointer"
-                        >
-                          <Upload size={13} /> Select Mock File
-                        </button>
+                        <label className="flex items-center gap-1.5 text-xs text-brand-silver bg-brand-mahogany border border-brand-copper/30 hover:bg-brand-copper/20 hover:border-brand-copper transition-all font-medium py-1.5 px-3 rounded-lg cursor-pointer">
+                          <Upload size={13} /> Select File
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => {
+                              const selectedFile = e.target.files?.[0];
+                              if (selectedFile) {
+                                handleRealFileUpload(docType.type, selectedFile);
+                              }
+                            }}
+                          />
+                        </label>
                       )}
                     </div>
                   </div>
@@ -656,7 +729,10 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
             {activeStep > 1 && (
               <button
                 type="button"
-                onClick={handleBack}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleBack();
+                }}
                 className="px-5 py-2.5 rounded-xl text-sm font-medium border border-brand-copper/30 bg-brand-mahogany/80 text-brand-silver hover:bg-brand-mahogany hover:text-white transition-colors cursor-pointer"
               >
                 Back
@@ -668,7 +744,10 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
             {activeStep === 1 && (
               <button
                 type="button"
-                onClick={handleSaveAsPendingFollowup}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSaveAsPendingFollowup();
+                }}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-brand-copper/30 bg-brand-mahogany/80 text-brand-silver hover:bg-brand-copper/20 transition-colors shadow-lg cursor-pointer"
               >
                 Add to pending follow ups
@@ -677,7 +756,10 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
             {activeStep < 4 ? (
               <button
                 type="button"
-                onClick={handleNext}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNext();
+                }}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-brand-copper text-brand-silver hover:bg-brand-copper/80 transition-colors shadow-lg cursor-pointer"
               >
                 Next Step
