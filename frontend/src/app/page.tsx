@@ -74,8 +74,7 @@ export default function Home() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setNotification(null);
-
+    try {
       // Send login request to secured backend API
       const res = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',

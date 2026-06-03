@@ -1,16 +1,16 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // Helper to get authorization header
-function getAuthHeader() {
+function getAuthHeader(): Record<string, string> {
   if (typeof window === 'undefined') return {};
   const token = localStorage.getItem('token');
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
-  const headers = {
+  const headers: Record<string, string> = {
     ...getAuthHeader(),
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   };
 
   // Do not set Content-Type header if sending FormData (Multipart file upload)
