@@ -42,6 +42,7 @@ interface FundRequest {
   approved_amount: number;
   status: string;
   approved_at: string;
+  created_at?: string;
 }
 
 interface Lead {
