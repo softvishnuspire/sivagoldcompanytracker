@@ -121,6 +121,9 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
   // Case completion
   const [finalRemarks, setFinalRemarks] = useState('');
 
+  // Fund request amount
+  const [requestedAmount, setRequestedAmount] = useState('');
+
   // Document Preview Modal states
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewDocType, setPreviewDocType] = useState<string | null>(null);
@@ -220,6 +223,30 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
       setVerificationNotes('');
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRequestFunds = async () => {
+    if (!requestedAmount) {
+      setError('Please enter a fund amount.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    try {
+      await apiRequest('/executive/request-funds', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId,
+          requestedAmount: Number(requestedAmount)
+        })
+      });
+      setRequestedAmount('');
+      await loadLeadDetails();
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit fund request.');
     } finally {
       setSubmitting(false);
     }
@@ -528,28 +555,75 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
               )}
 
               {/* 3. VISIT_CONFIRMED */}
-              {currentStatus === 'VISIT_CONFIRMED' && (
-                <div className="space-y-4">
-                  <p className="text-xs text-slate-300 font-sans leading-relaxed">
-                    Waiting for MD Funds Approval. Once approved, the status advances to <span className="text-amber-400 font-mono text-xs">MD_FUNDS_APPROVED</span>.
-                  </p>
-                  
-                  <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                    <p className="text-xs text-amber-500/60 font-mono">Status: WAITING FOR APPROVAL</p>
-                  </div>
+              {currentStatus === 'VISIT_CONFIRMED' && (() => {
+                const pendingFundRequest = lead.fund_requests?.find((r: any) => r.status === 'PENDING');
 
-                  <div className="pt-2 border-t border-amber-500/10">
-                    <p className="text-[10px] text-slate-400 mb-2">Demo Simulation: Bypass wait state and approve funds</p>
-                    <button 
-                      onClick={handleSimulateFundsApproval}
-                      disabled={submitting}
-                      className="px-4 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/25 text-xs font-mono transition-all cursor-pointer"
-                    >
-                      🛡️ SIMULATE MD FUNDS APPROVAL
-                    </button>
+                return (
+                  <div className="space-y-4">
+                    {pendingFundRequest ? (
+                      <>
+                        <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                          A fund request has been submitted to the Managing Director and is awaiting review. Once approved, the status advances to <span className="text-amber-400 font-mono text-xs">MD_FUNDS_APPROVED</span>.
+                        </p>
+                        
+                        <div className="p-4 rounded-xl bg-[#3d1510]/50 border border-amber-500/10 space-y-2">
+                          <div className="flex justify-between items-center text-xs font-mono">
+                            <span className="text-slate-400">Request Status:</span>
+                            <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/20">
+                              WAITING FOR APPROVAL
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs font-mono">
+                            <span className="text-slate-400">Requested Amount:</span>
+                            <span className="text-slate-100 font-bold">₹{Number(pendingFundRequest.requested_amount).toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs font-mono">
+                            <span className="text-slate-400">Request Date:</span>
+                            <span className="text-slate-200">{new Date(pendingFundRequest.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                          Enter the required buyout amount to request approval from the Managing Director.
+                        </p>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-mono text-amber-500/70 mb-1.5 uppercase">Requested Amount (₹)</label>
+                            <input 
+                              type="number"
+                              placeholder="Enter amount (e.g. 75000)"
+                              value={requestedAmount}
+                              onChange={(e) => setRequestedAmount(e.target.value)}
+                              className="w-full p-3 rounded-xl bg-[#300f0f]/50 border border-amber-500/15 text-slate-100 text-xs font-mono focus:outline-none focus:border-amber-500/50"
+                            />
+                          </div>
+                          <button 
+                            onClick={handleRequestFunds}
+                            disabled={submitting || !requestedAmount}
+                            className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:brightness-110 active:scale-[0.98] text-slate-950 font-bold text-xs tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            🚀 SEND TO MD FOR APPROVAL
+                          </button>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="pt-2 border-t border-amber-500/10">
+                      <p className="text-[10px] text-slate-400 mb-2">Demo Simulation: Bypass wait state and approve funds</p>
+                      <button 
+                        onClick={handleSimulateFundsApproval}
+                        disabled={submitting}
+                        className="px-4 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/25 text-xs font-mono transition-all cursor-pointer"
+                      >
+                        🛡️ SIMULATE MD FUNDS APPROVAL
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* 4. MD_FUNDS_APPROVED */}
               {currentStatus === 'MD_FUNDS_APPROVED' && (

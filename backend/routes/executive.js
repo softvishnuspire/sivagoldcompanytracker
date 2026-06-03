@@ -268,7 +268,7 @@ router.post('/update-status', async (req, res) => {
   try {
     const { data: lead, error: fetchErr } = await supabase
       .from('leads')
-      .select('current_status, executive_id')
+      .select('current_status, executive_id, loan_amount')
       .eq('id', leadId)
       .single();
 
@@ -281,6 +281,41 @@ router.post('/update-status', async (req, res) => {
     }
 
     await verifyAndAdvanceStatus(leadId, lead.current_status, targetStatus, userId);
+
+    // If advancing to MD_FUNDS_APPROVED, ensure a fund request exists and is approved (for simulation/override)
+    if (normalizeStatus(targetStatus) === 'MD_FUNDS_APPROVED') {
+      const { data: pendingReq } = await supabase
+        .from('fund_requests')
+        .select('*')
+        .eq('lead_id', leadId)
+        .eq('status', 'PENDING')
+        .maybeSingle();
+
+      if (pendingReq) {
+        await supabase
+          .from('fund_requests')
+          .update({
+            status: 'APPROVED',
+            approved_amount: pendingReq.requested_amount,
+            approved_by: userId,
+            approved_at: new Date()
+          })
+          .eq('id', pendingReq.id);
+      } else {
+        const mockAmount = lead.loan_amount ? Number(lead.loan_amount) : 50000;
+        await supabase
+          .from('fund_requests')
+          .insert([{
+            lead_id: leadId,
+            requested_amount: mockAmount,
+            approved_amount: mockAmount,
+            requested_by: userId,
+            approved_by: userId,
+            status: 'APPROVED',
+            approved_at: new Date()
+          }]);
+      }
+    }
 
     const { error: updateErr } = await supabase
       .from('leads')
@@ -298,6 +333,80 @@ router.post('/update-status', async (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 });
+
+// 4.5 POST /api/executive/request-funds
+router.post('/request-funds', async (req, res) => {
+  const { leadId, requestedAmount } = req.body;
+  const userId = req.user.id;
+
+  if (!leadId || !requestedAmount) {
+    return res.status(400).json({ error: 'leadId and requestedAmount are required.' });
+  }
+
+  const amount = Number(requestedAmount);
+  if (isNaN(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'requestedAmount must be a positive number.' });
+  }
+
+  try {
+    const { data: lead, error: fetchErr } = await supabase
+      .from('leads')
+      .select('current_status, executive_id')
+      .eq('id', leadId)
+      .single();
+
+    if (fetchErr || !lead) {
+      return res.status(404).json({ error: 'Lead not found.' });
+    }
+
+    if (lead.executive_id !== userId && req.user.role !== 'MD') {
+      return res.status(403).json({ error: 'Unauthorized to request funds for this lead.' });
+    }
+
+    const normStatus = normalizeStatus(lead.current_status);
+    if (normStatus !== 'VISIT_CONFIRMED') {
+      return res.status(400).json({ error: 'Funds can only be requested when status is VISIT_CONFIRMED.' });
+    }
+
+    // Check for existing pending request
+    const { data: existingReq } = await supabase
+      .from('fund_requests')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('status', 'PENDING')
+      .maybeSingle();
+
+    if (existingReq) {
+      return res.status(400).json({ error: 'A pending fund request already exists for this lead.' });
+    }
+
+    const { data: newReq, error: insertErr } = await supabase
+      .from('fund_requests')
+      .insert([{
+        lead_id: leadId,
+        requested_amount: amount,
+        requested_by: userId,
+        status: 'PENDING'
+      }])
+      .select()
+      .single();
+
+    if (insertErr) throw insertErr;
+
+    await addTimelineRecord(
+      leadId,
+      'VISIT_CONFIRMED',
+      `Requested funds of ₹${amount.toLocaleString('en-IN')}`,
+      userId
+    );
+
+    return res.json({ message: 'Fund request submitted successfully.', fundRequest: newReq });
+  } catch (err) {
+    console.error('Error requesting funds:', err.message);
+    return res.status(400).json({ error: err.message });
+  }
+});
+
 
 // 5. POST /api/executive/start-journey (Moves status to JOURNEY_STARTED)
 router.post('/start-journey', async (req, res) => {

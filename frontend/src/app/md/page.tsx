@@ -1046,23 +1046,14 @@ export default function MDDashboard() {
                               </td>
                               <td className="p-4 text-center">
                                 {r.status === 'PENDING' ? (
-                                  <div className="flex justify-center gap-2">
-                                    <button
-                                      onClick={() => {
-                                        setActiveFundRequest(r);
-                                        setFundModalType('reject');
-                                      }}
-                                      className="px-3 py-1.5 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-700 transition-all cursor-pointer text-[10px]"
-                                    >
-                                      Reject
-                                    </button>
+                                  <div className="flex justify-center">
                                     <button
                                       onClick={() => {
                                         setActiveFundRequest(r);
                                         setApprovedAmountInput(r.requested_amount.toString());
                                         setFundModalType('approve');
                                       }}
-                                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-755 transition-all cursor-pointer text-[10px]"
+                                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all cursor-pointer text-[10px]"
                                     >
                                       Approve
                                     </button>

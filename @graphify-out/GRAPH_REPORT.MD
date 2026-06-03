@@ -156,6 +156,8 @@ graph TD
 - **Syntax and Scope Fixes on Dashboards**: Resolved a compilation error in `LeadList.tsx` caused by a missing parent container closing `</div>` tag, and resolved an undefined reference error in `executive/page.tsx` where `setSearchTerm` was incorrectly called instead of `setSearchQuery`.
 - **Login Logo Card Styling Adjustments**: Widened the left brand pane to `md:w-[46%]` (reducing right pane to `md:w-[54%]`) and decreased its padding to `p-6 sm:p-8` to maximize horizontal space for the logo. Adjusted the logo card's height to `h-36 sm:h-44` and set scale to `scale-[1.7]` to eliminate empty margins while preventing any horizontal clipping of the logo's gold flourishes. Set the background to dark brand mahogany (`#3d1510`) with a gold border (`#c3902c/30`).
 - **Enhanced Ambient Background Gold Glows**: Layered additional gold glows on the login page background, including a central halo behind the login card, side glows, and higher opacity coefficients, creating a richer depth contrast with the burgundy gradient.
+- **Custom Fund Requests Stage Integration**: Replaced the automatic MD funds approval wait-state with an interactive input form for Field Executives. Executives now submit custom buyout amounts (with no initial defaults) to create real `fund_requests` records in the database. The MD dashboard approvals queue has been updated to remove rejection options, keeping the lead pending in `VISIT_CONFIRMED` until explicitly approved to `MD_FUNDS_APPROVED`.
+
 
 
 
