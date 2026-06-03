@@ -7,30 +7,22 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+
+// Helper to validate and default UUIDs
+function toValidUuid(id) {
+  if (!id) return null;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id) ? id : null;
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'shiva-gold-company-super-secret-key-2026';
 
-<<<<<<< HEAD
-// Security Middleware
-app.use(helmet());
-app.use(cors({
-  origin: '*', // Allow all for development. In production, restrict to frontend domain.
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Enable JSON and urlencoded parsing with large limit for documents/attachments
-app.use(express.json({ limit: '200mb' }));
-app.use(express.urlencoded({ limit: '200mb', extended: true }));
-=======
 // Enable Helmet to set security headers and hide X-Powered-By
 app.use(helmet());
 
-// CORS configuration - limit origins
+// CORS configuration - limit origins, allow localhost:3000 and process.env.FRONTEND_URL
 const allowedOrigins = [
   'http://localhost:3000',
   process.env.FRONTEND_URL
@@ -41,6 +33,9 @@ app.use(cors({
     // allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
+      if (origin.startsWith('http://localhost:')) {
+        return callback(null, true);
+      }
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
@@ -49,12 +44,14 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: '10kb' })); // limit request body size to prevent DoS
+// Enable JSON and urlencoded parsing with large limit for documents/attachments
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ limit: '200mb', extended: true }));
 
 // Rate Limiting (limit every endpoint)
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 1000, // Limit each IP to 1000 requests per windowMs for development / analytics queries
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests from this IP, please try again after 15 minutes.' }
@@ -69,7 +66,6 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Please try again after 15 minutes.' }
 });
->>>>>>> 5a28cd146c6c71dd099ea595154b199058a3fc53
 
 // Rate Limiter: Limit requests to 100 per 15 minutes window
 const limiter = rateLimit({
@@ -95,12 +91,11 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // SECURITY MIDDLEWARES & HELPERS
 // =========================================================================
 
-<<<<<<< HEAD
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Shiva Gold Management System Backend API is active.', dbConnected: !!supabaseUrl });
 });
-=======
+
 // Authentication Middleware
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -118,7 +113,6 @@ function authenticateToken(req, res, next) {
     next();
   });
 }
->>>>>>> 5a28cd146c6c71dd099ea595154b199058a3fc53
 
 // Role Authorization Middleware
 function requireRole(allowedRoles) {
@@ -1443,7 +1437,6 @@ app.get('/api/rm/reports', authenticateToken, requireRole(['RM']), async (req, r
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running smoothly', dbConnected: !!supabaseUrl });
 });
->>>>>>> 5a28cd146c6c71dd099ea595154b199058a3fc53
 
 // 1. GET /api/leads - Fetch all leads with nested relationships
 app.get('/api/leads', authenticateToken, requireRole(['TELECALLER']), async (req, res) => {
@@ -1542,7 +1535,6 @@ app.post('/api/leads', authenticateToken, requireRole(['TELECALLER']), async (re
 
     // Insert documents if provided
     if (documents && Array.isArray(documents) && documents.length > 0) {
-<<<<<<< HEAD
       const dbDocs = documents.map(d => {
         let docType = d.documentType || 'OTHER';
         if (docType === 'KYC') {
@@ -1564,16 +1556,6 @@ app.post('/api/leads', authenticateToken, requireRole(['TELECALLER']), async (re
       if (docError) {
         console.error('[POST /leads] Document insert failed:', docError.message);
       }
-=======
-      const dbDocs = documents.map(d => ({
-        id: crypto.randomUUID(),
-        lead_id: leadId,
-        document_type: d.documentType,
-        file_url: d.fileUrl || '#',
-        uploaded_by: telecaller_id
-      }));
-      await supabase.from('lead_documents').insert(dbDocs);
->>>>>>> 5a28cd146c6c71dd099ea595154b199058a3fc53
     }
 
     res.status(201).json(leadData);
@@ -1636,7 +1618,6 @@ app.put('/api/leads/:id', authenticateToken, requireRole(['TELECALLER']), async 
       updated_by: req.user.id
     });
 
-<<<<<<< HEAD
     // Update documents if provided
     if (documents) {
       // 1. Delete old documents first
@@ -1667,9 +1648,6 @@ app.put('/api/leads/:id', authenticateToken, requireRole(['TELECALLER']), async 
         }
       }
     }
-
-=======
->>>>>>> 5a28cd146c6c71dd099ea595154b199058a3fc53
     res.json(leadData);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error', details: err.message });
@@ -1813,13 +1791,59 @@ app.patch('/api/leads/:id/followups/:followupId/complete', authenticateToken, re
   }
 });
 
-<<<<<<< HEAD
 // 7. DELETE /api/leads/:id - Delete a lead and its related records
 app.delete('/api/leads/:id', async (req, res) => {
-=======
+  try {
+    const { id } = req.params;
+
+    // 1. Delete from lead_documents
+    const { error: docsError } = await supabase
+      .from('lead_documents')
+      .delete()
+      .eq('lead_id', id);
+
+    if (docsError) {
+      return res.status(400).json({ error: docsError.message });
+    }
+
+    // 2. Delete from lead_timeline
+    const { error: timelineError } = await supabase
+      .from('lead_timeline')
+      .delete()
+      .eq('lead_id', id);
+
+    if (timelineError) {
+      return res.status(400).json({ error: timelineError.message });
+    }
+
+    // 3. Delete from customer_interactions
+    const { error: interactionsError } = await supabase
+      .from('customer_interactions')
+      .delete()
+      .eq('lead_id', id);
+
+    if (interactionsError) {
+      return res.status(400).json({ error: interactionsError.message });
+    }
+
+    // 4. Delete the lead itself
+    const { error: leadError } = await supabase
+      .from('leads')
+      .delete()
+      .eq('id', id);
+
+    if (leadError) {
+      return res.status(400).json({ error: leadError.message });
+    }
+
+    res.json({ success: true, message: 'Lead and related entries deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
 // Endpoint to verify Supabase connection
 app.get('/api/supabase-check', async (req, res) => {
->>>>>>> 5a28cd146c6c71dd099ea595154b199058a3fc53
   try {
     if (!supabaseUrl || !supabaseAnonKey) {
       return res.status(500).json({
@@ -1870,7 +1894,6 @@ app.get('/api/supabase-check', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 // 404 Route handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found.' });
@@ -1885,8 +1908,6 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
-=======
->>>>>>> 5a28cd146c6c71dd099ea595154b199058a3fc53
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
