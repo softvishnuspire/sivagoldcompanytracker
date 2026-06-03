@@ -17,14 +17,15 @@ function toValidUuid(id) {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || 'shiva-gold-company-super-secret-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'shivagold_super_secret_jwt_key_2026';
 
 // Enable Helmet to set security headers and hide X-Powered-By
 app.use(helmet());
 
-// CORS configuration - limit origins, allow localhost:3000 and process.env.FRONTEND_URL
+// CORS configuration - limit origins, allow localhost:3000, 127.0.0.1:3000 and process.env.FRONTEND_URL
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://127.0.0.1:3000',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -33,7 +34,7 @@ app.use(cors({
     // allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
-      if (origin.startsWith('http://localhost:')) {
+      if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
         return callback(null, true);
       }
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';

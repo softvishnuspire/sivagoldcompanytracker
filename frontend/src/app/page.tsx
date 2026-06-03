@@ -75,8 +75,10 @@ export default function Home() {
     e.preventDefault();
     setLoading(true);
     try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const cleanApiBase = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
       // Send login request to secured backend API
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch(`${cleanApiBase}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

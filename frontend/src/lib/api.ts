@@ -24,6 +24,15 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('siva_token');
+        localStorage.removeItem('siva_user');
+        window.location.href = '/';
+      }
+    }
     let errorMessage = 'An error occurred';
     try {
       const errData = await response.json();

@@ -121,6 +121,8 @@ export default function RMDashboard() {
   // =========================================================================
   // API INTEGRATION FETCHES
   // =========================================================================
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
   const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
     const token = localStorage.getItem('siva_token');
     if (!token) {
@@ -135,7 +137,9 @@ export default function RMDashboard() {
       'Authorization': `Bearer ${token}`
     };
 
-    const res = await fetch(url, { ...options, headers });
+    const cleanApiBase = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
+    const finalUrl = url.replace('http://localhost:5000/api', cleanApiBase);
+    const res = await fetch(finalUrl, { ...options, headers });
     
     if (res.status === 401 || res.status === 403) {
       localStorage.removeItem('siva_token');
