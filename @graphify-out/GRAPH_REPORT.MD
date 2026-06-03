@@ -21,6 +21,10 @@ graph TD
     backend --> Express
 ```
 
-## Details
-- **Frontend**: Next.js App Router (initialized using `create-next-app` under `--ts` and `--tailwind` flags).
+## Directory Structure Details
+- **Frontend Paths (Role-Based Route Directories)**:
+  - `src/app/md/page.tsx` - Managing Director dashboard route.
+  - `src/app/rm/page.tsx` - Relationship Manager dashboard route.
+  - `src/app/telecaller/page.tsx` - Telecaller dashboard route.
+  - `src/app/executive/page.tsx` - Executive dashboard route.
 - **Backend**: Express API server initialized at `backend/index.js` (runs on default port 5000).
