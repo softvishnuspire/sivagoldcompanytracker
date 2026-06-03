@@ -74,67 +74,44 @@ export default function Home() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setNotification(null);
 
     try {
-      // 1. Query the users table for the given email, role, and active status
-      const { data: users, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email.trim())
-        .eq('role', role)
-        .eq('status', 'active');
+      const res = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
 
-      if (error) {
-        console.error('Supabase query error:', error);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Invalid credentials or role mismatch.');
       }
 
-      // 2. Check if a user was found
-      if (users && users.length > 0) {
-        const user = users[0];
-        
-        // Save current user session details
-        localStorage.setItem('siva_user', JSON.stringify({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          employee_code: user.employee_code,
-          branch_id: user.branch_id
-        }));
-
-        if (role === 'telecaller') {
-          router.push('/telecaller');
-        } else {
-          setNotification(`The ${roleDetails[role].title} workspace is currently under collaborative construction.`);
-          setTimeout(() => setNotification(null), 4000);
-        }
-      } else {
-        // 3. Fallback: If DB query returned nothing (e.g. database is not seeded yet)
-        // Check for dev-mode mock logins to avoid locking developers out
-        if (email.trim() === 'agent01@sivagold.com' || email.trim().includes('sivagold.com')) {
-          localStorage.setItem('siva_user', JSON.stringify({
-            id: 'mock-uuid-tc-agent-1',
-            name: 'Anil Telecaller',
-            email: email.trim(),
-            role: role,
-            employee_code: 'SGT-TC-01',
-            branch_id: 'mock-branch-vijayawada'
-          }));
-
-          if (role === 'telecaller') {
-            router.push('/telecaller');
-          } else {
-            setNotification(`The ${roleDetails[role].title} workspace is currently under collaborative construction.`);
-            setTimeout(() => setNotification(null), 4000);
-          }
-        } else {
-          setNotification('Invalid credentials or role mismatch. Please verify email and role.');
-          setTimeout(() => setNotification(null), 4000);
-        }
+      // Check if user role matches the selected role
+      if (data.user.role.toUpperCase() !== role.toUpperCase()) {
+        throw new Error(`Role mismatch. Your account is registered as ${data.user.role.toUpperCase()} (selected: ${role.toUpperCase()}).`);
       }
-    } catch (err) {
+
+      // Save user session details
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('siva_user', JSON.stringify(data.user));
+
+      // Redirect based on selected role
+      if (role === 'executive') {
+        router.push('/executive');
+      } else if (role === 'telecaller') {
+        router.push('/telecaller');
+      } else if (role === 'rm') {
+        router.push('/rm');
+      } else if (role === 'md') {
+        router.push('/md');
+      }
+    } catch (err: any) {
       console.error('Failed to sign in:', err);
-      setNotification('Network error. Proceeding with mock login session.');
+      setNotification(err.message || 'An unexpected authentication error occurred.');
       setTimeout(() => setNotification(null), 4000);
     } finally {
       setLoading(false);

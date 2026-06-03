@@ -3,14 +3,33 @@ const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Enable CORS for frontend requests
-app.use(cors());
+// Security Middleware
+app.use(helmet());
+app.use(cors({
+  origin: '*', // Allow all for development. In production, restrict to frontend domain.
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Enable JSON and urlencoded parsing with large limit for documents/attachments
 app.use(express.json({ limit: '200mb' }));
 app.use(express.urlencoded({ limit: '200mb', extended: true }));
+
+// Rate Limiter: Limit requests to 100 per 15 minutes window
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes.' }
+});
+app.use('/api', limiter);
 
 // Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL || '';
@@ -31,7 +50,7 @@ const toValidUuid = (uuidStr) => {
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend is running smoothly', dbConnected: !!supabaseUrl });
+  res.json({ status: 'ok', message: 'Shiva Gold Management System Backend API is active.', dbConnected: !!supabaseUrl });
 });
 
 // Temp Endpoint to check existing users
@@ -44,6 +63,13 @@ app.get('/api/users', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Import and Register Routers for auth and executive
+const authRoutes = require('./routes/auth');
+const executiveRoutes = require('./routes/executive');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/executive', executiveRoutes);
 
 // 1. GET /api/leads - Fetch all leads with nested relationships
 app.get('/api/leads', async (req, res) => {
@@ -155,13 +181,22 @@ app.post('/api/leads', async (req, res) => {
 
     // Insert documents if provided
     if (documents && Array.isArray(documents) && documents.length > 0) {
-      const dbDocs = documents.map(d => ({
-        id: crypto.randomUUID(),
-        lead_id: leadId,
-        document_type: d.documentType,
-        file_url: d.fileUrl || '#',
-        uploaded_by: toValidUuid(telecaller_id)
-      }));
+      const dbDocs = documents.map(d => {
+        let docType = d.documentType || 'OTHER';
+        if (docType === 'KYC') {
+          const lowerName = (d.fileName || '').toLowerCase();
+          docType = lowerName.includes('pan') ? 'PAN' : 'AADHAR';
+        } else if (docType === 'ADDITIONAL') {
+          docType = 'OTHER';
+        }
+        return {
+          id: crypto.randomUUID(),
+          lead_id: leadId,
+          document_type: docType,
+          file_url: d.fileUrl || '#',
+          uploaded_by: toValidUuid(telecaller_id)
+        };
+      });
       console.log(`[POST /leads] Inserting ${dbDocs.length} documents for lead ${leadId}`);
       const { error: docError } = await supabase.from('lead_documents').insert(dbDocs);
       if (docError) {
@@ -240,13 +275,22 @@ app.put('/api/leads/:id', async (req, res) => {
 
       // 2. Insert new documents if any
       if (Array.isArray(documents) && documents.length > 0) {
-        const dbDocs = documents.map(d => ({
-          id: crypto.randomUUID(),
-          lead_id: id,
-          document_type: d.documentType,
-          file_url: d.fileUrl || '#',
-          uploaded_by: toValidUuid(telecaller_id)
-        }));
+        const dbDocs = documents.map(d => {
+          let docType = d.documentType || 'OTHER';
+          if (docType === 'KYC') {
+            const lowerName = (d.fileName || '').toLowerCase();
+            docType = lowerName.includes('pan') ? 'PAN' : 'AADHAR';
+          } else if (docType === 'ADDITIONAL') {
+            docType = 'OTHER';
+          }
+          return {
+            id: crypto.randomUUID(),
+            lead_id: id,
+            document_type: docType,
+            file_url: d.fileUrl || '#',
+            uploaded_by: toValidUuid(telecaller_id)
+          };
+        });
         console.log(`[PUT /leads/${id}] Inserting ${dbDocs.length} documents`);
         const { error: docError } = await supabase.from('lead_documents').insert(dbDocs);
         if (docError) {
@@ -394,6 +438,7 @@ app.patch('/api/leads/:id/followups/:followupId/complete', async (req, res) => {
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
+
 // 7. DELETE /api/leads/:id - Delete a lead and its related records
 app.delete('/api/leads/:id', async (req, res) => {
   try {
@@ -443,6 +488,11 @@ app.delete('/api/leads/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
+});
+
+// 404 Route handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found.' });
 });
 
 // Global Error Handler Middleware
