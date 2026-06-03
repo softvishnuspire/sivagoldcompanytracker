@@ -97,7 +97,7 @@ export default function ReportsView({ leads }: ReportsViewProps) {
             <div className="text-xs text-brand-slate font-semibold uppercase tracking-wider">Conversion Ratio</div>
             <div className="text-2xl font-bold text-brand-silver mt-0.5">
               {leads.length > 0 
-                ? Math.round((leads.filter(l => ['QUALIFIED', 'RM VERIFICATION', 'APPROVED', 'COMPLETED'].includes(l.status)).length / leads.length) * 100) 
+                ? Math.round((leads.filter(l => ['DETAILS_COLLECTED', 'SENT_TO_RM', 'RM_APPROVED', 'CASE_COMPLETED'].includes(l.status)).length / leads.length) * 100) 
                 : 0}%
             </div>
             <div className="text-[10px] text-brand-slate mt-1 font-medium">Qualified Leads / Total Leads</div>
@@ -112,7 +112,7 @@ export default function ReportsView({ leads }: ReportsViewProps) {
             <div className="text-xs text-brand-slate font-semibold uppercase tracking-wider">Rejection Ratio</div>
             <div className="text-2xl font-bold text-brand-silver mt-0.5">
               {leads.length > 0 
-                ? Math.round((leads.filter(l => l.status === 'REJECTED').length / leads.length) * 100) 
+                ? Math.round((leads.filter(l => l.status === 'RM_REJECTED').length / leads.length) * 100) 
                 : 0}%
             </div>
             <div className="text-[10px] text-brand-slate mt-1 font-medium">Rejected Leads / Total Leads</div>

@@ -21,24 +21,29 @@ export interface Followup {
 }
 
 export type LeadStatus =
-  | 'NEW LEAD'
   | 'CUSTOMER_DETAILS_CREATED'
-  | 'FOLLOW-UP'
-  | 'QUALIFIED'
-  | 'REJECTED'
-  | 'RM VERIFICATION'
-  | 'APPROVED'
-  | 'EXECUTIVE ASSIGNED'
-  | 'CUSTOMER CALLED'
-  | 'VISIT CONFIRMED'
-  | 'TRAVEL STARTED'
-  | 'REACHED CUSTOMER'
-  | 'BANK VISIT'
-  | 'PAYMENT DONE'
-  | 'GOLD RECEIVED'
-  | 'BALANCE PAID'
-  | 'IMAGES UPLOADED'
-  | 'COMPLETED';
+  | 'FOLLOWUP_IN_PROGRESS'
+  | 'DETAILS_COLLECTED'
+  | 'DOCUMENTS_RECEIVED'
+  | 'PRICE_CONFIRMED'
+  | 'SENT_TO_RM'
+  | 'RM_APPROVED'
+  | 'RM_REVERIFICATION'
+  | 'RM_REJECTED'
+  | 'EXECUTIVE_ASSIGNED'
+  | 'CUSTOMER_CALLED'
+  | 'VISIT_CONFIRMED'
+  | 'MD_FUNDS_APPROVED'
+  | 'JOURNEY_STARTED'
+  | 'REACHED_CUSTOMER'
+  | 'CUSTOMER_INTERACTION'
+  | 'BANK_VISIT'
+  | 'AGREEMENT_PENDING'
+  | 'PAYMENT_COMPLETED'
+  | 'GOLD_RECEIVED'
+  | 'BALANCE_SETTLED'
+  | 'IMAGES_UPLOADED'
+  | 'CASE_COMPLETED';
 
 export interface Lead {
   id: string;
@@ -55,6 +60,7 @@ export interface Lead {
   branchName: string;
   loanAmount: number;
   loanAccountNumber: string;
+  source?: string;
   status: LeadStatus;
   telecallerId: string;
   rmId?: string;

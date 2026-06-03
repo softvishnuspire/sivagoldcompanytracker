@@ -9,7 +9,8 @@ const PORT = process.env.PORT || 5000;
 
 // Enable CORS for frontend requests
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ limit: '200mb', extended: true }));
 
 // Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL || '';
@@ -21,9 +22,27 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Helper to sanitize UUID inputs
+const toValidUuid = (uuidStr) => {
+  if (!uuidStr) return null;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuidStr) ? uuidStr : null;
+};
+
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running smoothly', dbConnected: !!supabaseUrl });
+});
+
+// Temp Endpoint to check existing users
+app.get('/api/users', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('users').select('*');
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // 1. GET /api/leads - Fetch all leads with nested relationships
@@ -40,7 +59,19 @@ app.get('/api/leads', async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (error) {
+      console.error('[GET /leads] Supabase error:', error.message);
       return res.status(400).json({ error: error.message });
+    }
+
+    // Debug: log document counts per lead
+    if (dbLeads) {
+      dbLeads.forEach(lead => {
+        if (lead.documents && lead.documents.length > 0) {
+          console.log(`[GET /leads] Lead ${lead.lead_number}: ${lead.documents.length} documents found`);
+        } else {
+          console.log(`[GET /leads] Lead ${lead.lead_number}: 0 documents (raw: ${JSON.stringify(lead.documents)})`);
+        }
+      });
     }
 
     res.json(dbLeads || []);
@@ -67,6 +98,7 @@ app.post('/api/leads', async (req, res) => {
       loan_account_number,
       current_status,
       telecaller_id,
+      source,
       documents
     } = req.body;
 
@@ -103,7 +135,8 @@ app.post('/api/leads', async (req, res) => {
         loan_amount: Number(loan_amount || 0),
         loan_account_number,
         current_status: current_status || 'CUSTOMER_DETAILS_CREATED',
-        telecaller_id
+        source: source || null,
+        telecaller_id: toValidUuid(telecaller_id)
       })
       .select()
       .single();
@@ -117,7 +150,7 @@ app.post('/api/leads', async (req, res) => {
       lead_id: leadId,
       status: current_status || 'CUSTOMER_DETAILS_CREATED',
       remarks: 'Lead created in systems directory',
-      updated_by: telecaller_id
+      updated_by: toValidUuid(telecaller_id)
     });
 
     // Insert documents if provided
@@ -127,9 +160,13 @@ app.post('/api/leads', async (req, res) => {
         lead_id: leadId,
         document_type: d.documentType,
         file_url: d.fileUrl || '#',
-        uploaded_by: telecaller_id
+        uploaded_by: toValidUuid(telecaller_id)
       }));
-      await supabase.from('lead_documents').insert(dbDocs);
+      console.log(`[POST /leads] Inserting ${dbDocs.length} documents for lead ${leadId}`);
+      const { error: docError } = await supabase.from('lead_documents').insert(dbDocs);
+      if (docError) {
+        console.error('[POST /leads] Document insert failed:', docError.message);
+      }
     }
 
     res.status(201).json(leadData);
@@ -156,7 +193,9 @@ app.put('/api/leads/:id', async (req, res) => {
       loan_amount,
       loan_account_number,
       current_status,
-      telecaller_id
+      telecaller_id,
+      source,
+      documents
     } = req.body;
 
     const { data: leadData, error: updateError } = await supabase
@@ -175,6 +214,7 @@ app.put('/api/leads/:id', async (req, res) => {
         loan_amount: Number(loan_amount || 0),
         loan_account_number,
         current_status,
+        source: source || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -190,8 +230,30 @@ app.put('/api/leads/:id', async (req, res) => {
       lead_id: id,
       status: current_status,
       remarks: 'Lead details modified by Telecaller',
-      updated_by: telecaller_id
+      updated_by: toValidUuid(telecaller_id)
     });
+
+    // Update documents if provided
+    if (documents) {
+      // 1. Delete old documents first
+      await supabase.from('lead_documents').delete().eq('lead_id', id);
+
+      // 2. Insert new documents if any
+      if (Array.isArray(documents) && documents.length > 0) {
+        const dbDocs = documents.map(d => ({
+          id: crypto.randomUUID(),
+          lead_id: id,
+          document_type: d.documentType,
+          file_url: d.fileUrl || '#',
+          uploaded_by: toValidUuid(telecaller_id)
+        }));
+        console.log(`[PUT /leads/${id}] Inserting ${dbDocs.length} documents`);
+        const { error: docError } = await supabase.from('lead_documents').insert(dbDocs);
+        if (docError) {
+          console.error(`[PUT /leads/${id}] Document insert failed:`, docError.message);
+        }
+      }
+    }
 
     res.json(leadData);
   } catch (err) {
@@ -224,7 +286,7 @@ app.patch('/api/leads/:id/status', async (req, res) => {
       lead_id: id,
       status: current_status,
       remarks: remarks || `Status updated to ${current_status}`,
-      updated_by: telecaller_id
+      updated_by: toValidUuid(telecaller_id)
     });
 
     res.json(leadData);
@@ -245,7 +307,7 @@ app.post('/api/leads/:id/followups', async (req, res) => {
       .insert({
         id: crypto.randomUUID(),
         lead_id: id,
-        employee_id: telecaller_id,
+        employee_id: toValidUuid(telecaller_id),
         interaction_type: 'FOLLOWUP',
         notes: `Followup Date: ${date} - ${remarks}`
       });
@@ -254,11 +316,11 @@ app.post('/api/leads/:id/followups', async (req, res) => {
       return res.status(400).json({ error: interactionError.message });
     }
 
-    // Update lead status to FOLLOW-UP
+    // Update lead status to FOLLOWUP_IN_PROGRESS
     const { data: leadData, error: updateError } = await supabase
       .from('leads')
       .update({
-        current_status: 'FOLLOW-UP',
+        current_status: 'FOLLOWUP_IN_PROGRESS',
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -272,9 +334,9 @@ app.post('/api/leads/:id/followups', async (req, res) => {
     // Add timeline log
     await supabase.from('lead_timeline').insert({
       lead_id: id,
-      status: 'FOLLOW-UP',
+      status: 'FOLLOWUP_IN_PROGRESS',
       remarks: `Follow-up scheduled: ${remarks}`,
-      updated_by: telecaller_id
+      updated_by: toValidUuid(telecaller_id)
     });
 
     res.json(leadData);
@@ -295,7 +357,7 @@ app.patch('/api/leads/:id/followups/:followupId/complete', async (req, res) => {
       .insert({
         id: crypto.randomUUID(),
         lead_id: id,
-        employee_id: telecaller_id,
+        employee_id: toValidUuid(telecaller_id),
         interaction_type: 'CALL',
         notes: `Completed followup call: ${remarks}`
       });
@@ -304,11 +366,11 @@ app.patch('/api/leads/:id/followups/:followupId/complete', async (req, res) => {
       return res.status(400).json({ error: interactionError.message });
     }
 
-    // Update lead status back to CUSTOMER_DETAILS_CREATED (or status of choice)
+    // Update lead status back to DETAILS_COLLECTED (followup completed, details verified)
     const { data: leadData, error: updateError } = await supabase
       .from('leads')
       .update({
-        current_status: 'CUSTOMER_DETAILS_CREATED',
+        current_status: 'DETAILS_COLLECTED',
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -322,15 +384,74 @@ app.patch('/api/leads/:id/followups/:followupId/complete', async (req, res) => {
     // Add timeline log
     await supabase.from('lead_timeline').insert({
       lead_id: id,
-      status: 'CUSTOMER_DETAILS_CREATED',
+      status: 'DETAILS_COLLECTED',
       remarks: `Completed followup call log: ${remarks}`,
-      updated_by: telecaller_id
+      updated_by: toValidUuid(telecaller_id)
     });
 
     res.json(leadData);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
+});
+// 7. DELETE /api/leads/:id - Delete a lead and its related records
+app.delete('/api/leads/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Delete from lead_documents
+    const { error: docsError } = await supabase
+      .from('lead_documents')
+      .delete()
+      .eq('lead_id', id);
+
+    if (docsError) {
+      return res.status(400).json({ error: docsError.message });
+    }
+
+    // 2. Delete from lead_timeline
+    const { error: timelineError } = await supabase
+      .from('lead_timeline')
+      .delete()
+      .eq('lead_id', id);
+
+    if (timelineError) {
+      return res.status(400).json({ error: timelineError.message });
+    }
+
+    // 3. Delete from customer_interactions
+    const { error: interactionsError } = await supabase
+      .from('customer_interactions')
+      .delete()
+      .eq('lead_id', id);
+
+    if (interactionsError) {
+      return res.status(400).json({ error: interactionsError.message });
+    }
+
+    // 4. Delete the lead itself
+    const { error: leadError } = await supabase
+      .from('leads')
+      .delete()
+      .eq('id', id);
+
+    if (leadError) {
+      return res.status(400).json({ error: leadError.message });
+    }
+
+    res.json({ success: true, message: 'Lead and related entries deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Global Error Handler Middleware
+app.use((err, req, res, next) => {
+  console.error('Express Error Handler:', err);
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request entity too large. Maximum limit is 200MB.' });
+  }
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
 app.listen(PORT, () => {

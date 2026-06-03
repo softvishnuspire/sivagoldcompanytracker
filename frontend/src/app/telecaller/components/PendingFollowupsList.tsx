@@ -7,21 +7,23 @@ import {
   AlertTriangle,
   ArrowRightCircle,
   FileEdit,
-  ClipboardList
+  ClipboardList,
+  Trash2
 } from 'lucide-react';
 import { Lead } from '../types';
 
 interface PendingFollowupsListProps {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
+  onDelete: (leadId: string) => void;
 }
 
-export default function PendingFollowupsList({ leads, onEdit }: PendingFollowupsListProps) {
+export default function PendingFollowupsList({ leads, onEdit, onDelete }: PendingFollowupsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Filter leads that are in 'FOLLOW-UP' status AND are missing critical details
+  // Filter leads that are in 'FOLLOWUP_IN_PROGRESS' status AND are missing critical details
   const pendingLeads = leads.filter(lead => {
-    const isFollowup = lead.status === 'FOLLOW-UP';
+    const isFollowup = lead.status === 'FOLLOWUP_IN_PROGRESS';
     const isMissingDetails = 
       lead.goldWeight === 0 || 
       !lead.bankName || 
@@ -119,14 +121,27 @@ export default function PendingFollowupsList({ leads, onEdit }: PendingFollowups
                   </div>
                 </div>
 
-                <button
-                  onClick={() => onEdit(lead)}
-                  className="w-full py-2.5 bg-brand-copper hover:bg-brand-copper/85 text-brand-silver hover:text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer mt-2"
-                >
-                  <FileEdit size={14} />
-                  Complete Details
-                  <ArrowRightCircle size={13} />
-                </button>
+                <div className="flex gap-2.5 mt-2">
+                  <button
+                    onClick={() => onEdit(lead)}
+                    className="flex-1 py-2.5 bg-brand-copper hover:bg-brand-copper/85 text-brand-silver hover:text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <FileEdit size={14} />
+                    Complete Details
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to delete lead ${lead.leadNumber} (${lead.customerName})?`)) {
+                        onDelete(lead.id);
+                      }
+                    }}
+                    className="py-2.5 px-3.5 bg-brand-mahogany hover:bg-rose-500/10 text-rose-400 hover:text-rose-500 border border-brand-copper/25 hover:border-rose-500/30 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                    title="Delete Lead"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
             );
           })

@@ -27,12 +27,13 @@ import LeadList from './components/LeadList';
 import FollowupList from './components/FollowupList';
 import ReportsView from './components/ReportsView';
 import PendingFollowupsList from './components/PendingFollowupsList';
+import DocumentsView from './components/DocumentsView';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function TelecallerDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'pending-followups' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'pending-followups' | 'documents' | 'reports'>('dashboard');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -50,7 +51,7 @@ export default function TelecallerDashboard() {
       id: doc.id,
       leadId: doc.lead_id,
       documentType: doc.document_type,
-      fileName: doc.file_url.split('/').pop() || 'document.pdf',
+      fileName: doc.file_name || doc.file_url?.split('/').pop() || 'document.pdf',
       fileUrl: doc.file_url,
       uploadedBy: doc.uploaded_by,
       createdAt: doc.created_at
@@ -84,6 +85,7 @@ export default function TelecallerDashboard() {
       branchName: db.branch_name,
       loanAmount: Number(db.loan_amount || 0),
       loanAccountNumber: db.loan_account_number,
+      source: db.source,
       status: db.current_status as LeadStatus,
       telecallerId: db.telecaller_id,
       rmId: db.rm_id,
@@ -148,18 +150,18 @@ export default function TelecallerDashboard() {
 
   // Helper to compute stats dynamically
   const getStats = (): DashboardStats => {
-    const newLeads = leads.filter(l => l.status === 'NEW LEAD' || l.status === 'CUSTOMER_DETAILS_CREATED').length;
+    const newLeads = leads.filter(l => l.status === 'CUSTOMER_DETAILS_CREATED').length;
     
     const pendingFollowups = leads.filter(l => 
-      l.status === 'FOLLOW-UP' || 
+      l.status === 'FOLLOWUP_IN_PROGRESS' || 
       (l.followups && l.followups.some(f => f.status === 'PENDING'))
     ).length;
 
-    const qualifiedLeads = leads.filter(l => l.status === 'QUALIFIED').length;
-    const rejectedLeads = leads.filter(l => l.status === 'REJECTED').length;
+    const qualifiedLeads = leads.filter(l => l.status === 'DETAILS_COLLECTED').length;
+    const rejectedLeads = leads.filter(l => l.status === 'RM_REJECTED').length;
     
     const sentToRM = leads.filter(l => 
-      !['NEW LEAD', 'CUSTOMER_DETAILS_CREATED', 'FOLLOW-UP', 'QUALIFIED', 'REJECTED'].includes(l.status)
+      !['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS', 'DETAILS_COLLECTED', 'RM_REJECTED'].includes(l.status)
     ).length;
 
     return { newLeads, pendingFollowups, qualifiedLeads, rejectedLeads, sentToRM };
@@ -189,9 +191,10 @@ export default function TelecallerDashboard() {
               bank_name: formData.bankName,
               branch_name: formData.branchName,
               loan_account_number: formData.loanAccountNumber,
-              loan_amount: formData.loanAmount,
               current_status: formData.status,
-              telecaller_id: telecallerId
+              source: formData.source,
+              telecaller_id: telecallerId,
+              documents: formData.documents
             })
           });
 
@@ -220,6 +223,7 @@ export default function TelecallerDashboard() {
               loan_account_number: formData.loanAccountNumber,
               loan_amount: formData.loanAmount,
               current_status: 'CUSTOMER_DETAILS_CREATED',
+              source: formData.source,
               telecaller_id: telecallerId,
               documents: formData.documents
             })
@@ -361,7 +365,7 @@ export default function TelecallerDashboard() {
       if (l.id === leadId) {
         return {
           ...l,
-          status: 'FOLLOW-UP' as LeadStatus,
+          status: 'FOLLOWUP_IN_PROGRESS' as LeadStatus,
           followups: [...(l.followups || []), newFollowup],
           updatedAt: new Date().toISOString()
         };
@@ -410,7 +414,7 @@ export default function TelecallerDashboard() {
         });
 
         const hasMorePending = updatedFollowups.some(f => f.status === 'PENDING');
-        const nextStatus: LeadStatus = hasMorePending ? 'FOLLOW-UP' : 'CUSTOMER_DETAILS_CREATED';
+        const nextStatus: LeadStatus = hasMorePending ? 'FOLLOWUP_IN_PROGRESS' : 'CUSTOMER_DETAILS_CREATED';
 
         return {
           ...l,
@@ -421,6 +425,30 @@ export default function TelecallerDashboard() {
       }
       return l;
     });
+    saveLeadsFallback(updated);
+  };
+
+  const handleDeleteLead = async (leadId: string) => {
+    if (dbConnected) {
+      try {
+        const response = await fetch(`${API_BASE}/leads/${leadId}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to delete lead');
+        }
+
+        await fetchLeads();
+        return;
+      } catch (err) {
+        console.error('Database delete lead failed.', err);
+      }
+    }
+
+    // Fallback Mode
+    const updated = leads.filter(l => l.id !== leadId);
     saveLeadsFallback(updated);
   };
 
@@ -441,6 +469,7 @@ export default function TelecallerDashboard() {
     { id: 'leads-list' as const, label: 'Lead Management', icon: ListTodo },
     { id: 'add-lead' as const, label: 'Add Lead', icon: PlusCircle },
     { id: 'pending-followups' as const, label: 'Pending Followups', icon: Clock },
+    { id: 'documents' as const, label: 'Documents', icon: FileText },
     { id: 'follow-ups' as const, label: 'Follow-ups', icon: PhoneCall },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 }
   ];
@@ -612,7 +641,7 @@ export default function TelecallerDashboard() {
                     </div>
 
                     <div className="space-y-3.5">
-                      {leads.filter(l => ['NEW LEAD', 'CUSTOMER_DETAILS_CREATED', 'FOLLOW-UP'].includes(l.status)).slice(0, 3).map((lead, index) => (
+                      {leads.filter(l => ['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(l.status)).slice(0, 3).map((lead, index) => (
                         <div key={index} className="flex items-center justify-between p-3.5 rounded-xl bg-brand-cherry/40 border border-brand-copper/15">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg bg-brand-copper/20 border border-brand-copper/30 text-brand-silver flex items-center justify-center font-bold text-xs">
@@ -632,7 +661,7 @@ export default function TelecallerDashboard() {
                           </button>
                         </div>
                       ))}
-                      {leads.filter(l => ['NEW LEAD', 'CUSTOMER_DETAILS_CREATED', 'FOLLOW-UP'].includes(l.status)).length === 0 && (
+                      {leads.filter(l => ['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(l.status)).length === 0 && (
                         <div className="py-8 text-center text-xs text-brand-slate/60 uppercase tracking-widest">
                           Queue is currently empty.
                         </div>
@@ -700,6 +729,7 @@ export default function TelecallerDashboard() {
                   onEdit={handleEditLeadTrigger}
                   onUpdateStatus={handleUpdateLeadStatus}
                   onAddFollowup={handleAddFollowup}
+                  onDelete={handleDeleteLead}
                 />
               </div>
             )}
@@ -719,7 +749,14 @@ export default function TelecallerDashboard() {
                 <PendingFollowupsList
                   leads={leads}
                   onEdit={handleEditLeadTrigger}
+                  onDelete={handleDeleteLead}
                 />
+              </div>
+            )}
+
+            {activeTab === 'documents' && (
+              <div className="animate-fadeIn">
+                <DocumentsView leads={leads} />
               </div>
             )}
 
