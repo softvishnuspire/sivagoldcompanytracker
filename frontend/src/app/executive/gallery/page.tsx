@@ -79,16 +79,16 @@ export default function GalleryPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn text-slate-800">
       
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">Verification Gallery</h1>
-        <p className="text-slate-400 text-sm mt-1">Review visual logs of collected gold articles and valuations.</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Verification Gallery</h1>
+        <p className="text-slate-500 text-sm mt-1">Review visual logs of collected gold articles and valuations.</p>
       </div>
 
-      <div className="bg-[#3d1510]/20 border border-amber-500/10 rounded-2xl p-6">
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
         {images.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 font-mono text-sm">
+          <div className="p-12 text-center text-slate-400 font-medium text-sm">
             No gold verification images uploaded yet. Upload images during the buyout steps to see them here.
           </div>
         ) : (
@@ -97,7 +97,7 @@ export default function GalleryPage() {
               <div 
                 key={img.id}
                 onClick={() => setPreviewImage(img)}
-                className="group relative cursor-pointer aspect-square rounded-xl overflow-hidden border border-amber-500/15 bg-slate-950/80 shadow-md transition-all duration-300 hover:scale-[1.03] hover:border-amber-500/40"
+                className="group relative cursor-pointer aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm transition-all duration-300 hover:scale-[1.03] hover:border-amber-500/40"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
@@ -120,32 +120,32 @@ export default function GalleryPage() {
       {/* Lightbox / Preview Modal */}
       {previewImage && (
         <div 
-          className="fixed inset-0 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn"
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn"
           onClick={() => setPreviewImage(null)}
         >
           <div 
-            className="relative max-w-3xl w-full max-h-[85vh] bg-[#3d1510]/80 border border-amber-500/15 p-3 rounded-2xl flex flex-col gap-4 text-left shadow-2xl animate-scaleUp"
+            className="relative max-w-3xl w-full max-h-[85vh] bg-white border border-slate-200 p-4 rounded-2xl flex flex-col gap-4 text-left shadow-2xl animate-scaleUp"
             onClick={(e) => e.stopPropagation()}
           >
             <button 
               onClick={() => setPreviewImage(null)}
-              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-amber-500 text-slate-950 font-bold flex items-center justify-center hover:brightness-110 shadow-lg cursor-pointer"
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-[#4d0711] text-white font-bold flex items-center justify-center hover:brightness-110 shadow-lg cursor-pointer border border-[#691823]/25"
             >
               ✕
             </button>
             
-            <div className="flex-1 overflow-hidden rounded-xl border border-amber-500/5 aspect-video relative">
+            <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 aspect-video relative bg-slate-50">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={previewImage.imageUrl} 
                 alt="Verification Detail preview" 
-                className="w-full h-full object-contain bg-black/60"
+                className="w-full h-full object-contain bg-slate-50"
               />
             </div>
 
-            <div className="px-3 font-mono text-xs text-slate-400 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-t border-amber-500/10 pt-2">
+            <div className="px-3 font-mono text-xs text-slate-500 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-t border-slate-200 pt-2">
               <div>
-                <p className="text-sm font-sans font-bold text-amber-500">{previewImage.customerName}</p>
+                <p className="text-sm font-sans font-bold text-slate-800">{previewImage.customerName}</p>
                 <p className="text-[10px]">Lead ID: {previewImage.leadNumber || previewImage.leadId.slice(0, 8)}</p>
               </div>
               <p className="text-[10px]">Uploaded on: {previewImage.createdAt ? new Date(previewImage.createdAt).toLocaleDateString() : 'N/A'}</p>

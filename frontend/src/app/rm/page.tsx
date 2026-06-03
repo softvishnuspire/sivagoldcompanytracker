@@ -472,10 +472,10 @@ export default function RMDashboard() {
       {/* ===================================================================
           SIDEBAR PANEL (Burgundy Theme)
           =================================================================== */}
-      <aside className="w-72 h-full bg-gradient-to-b from-[#4d0711] to-[#200206] border-r border-[#691823]/20 flex flex-col z-30 shrink-0 select-none">
+      <aside className="w-72 h-full bg-[#4d0711] border-r border-[#691823]/20 flex flex-col z-30 shrink-0 select-none">
         
         {/* Branding header */}
-        <div className="py-2 px-4 border-b border-[#691823]/20 flex flex-col items-center justify-center bg-[#4d0b13]/10">
+        <div className="py-2 px-4 border-b border-[#691823]/20 flex flex-col items-center justify-center bg-white/5">
           <div className="w-full h-36 flex items-center justify-center overflow-hidden">
             <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-auto" />
           </div>
@@ -525,15 +525,20 @@ export default function RMDashboard() {
               localStorage.removeItem('siva_user');
               window.location.href = '/';
             }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-amber-250/70 hover:bg-rose-500/10 hover:text-rose-400 border border-[#691823]/30 hover:border-rose-500/20 transition-all cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-amber-300 hover:bg-rose-500/10 hover:text-rose-300 border border-amber-500/30 hover:border-rose-500/40 transition-all cursor-pointer"
           >
-            🚪 Logout Portal
+            <svg className="w-4 h-4 shrink-0 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Logout Portal
           </button>
         </div>
 
         {/* Support Sidebar Footer */}
-        <div className="p-4 mx-4 mb-4 rounded-2xl bg-[#2e040a]/40 border border-[#691823]/20 flex items-center gap-3">
-          <span className="text-xl">📞</span>
+        <div className="p-4 mx-4 mb-4 rounded-2xl bg-white/5 border border-[#691823]/20 flex items-center gap-3">
+          <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          </svg>
           <div className="flex flex-col">
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Need Help?</span>
             <span className="text-[11px] font-black text-amber-400 font-mono mt-1">+91 888 999 5656</span>

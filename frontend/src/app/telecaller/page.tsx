@@ -369,7 +369,7 @@ export default function TelecallerDashboard() {
   return (
     <div className="min-h-screen bg-[#f4f5f8] text-slate-800 flex flex-col font-sans selection:bg-[#c3902c] selection:text-black">
       {/* Mobile Header */}
-      <header className="lg:hidden flex items-center justify-between p-4 bg-gradient-to-r from-[#4d0711] to-[#200206] border-b border-[#691823]/20 sticky top-0 z-40">
+      <header className="lg:hidden flex items-center justify-between p-4 bg-[#4d0711] border-b border-[#691823]/20 sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -395,20 +395,20 @@ export default function TelecallerDashboard() {
       <div className="flex flex-1 relative">
         {/* Sidebar for PC / Navigation Drawer for Mobile */}
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-[#4d0711] to-[#200206] border-r border-[#691823]/20 flex flex-col justify-between transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static hide-scrollbar ${
+          className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#4d0711] border-r border-[#691823]/20 flex flex-col justify-between transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static hide-scrollbar ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
           <div>
             {/* Sidebar Logo */}
-            <div className="py-2 px-4 border-b border-[#691823]/20 hidden lg:flex flex-col items-center justify-center w-full bg-[#4d0b13]/10">
+            <div className="py-2 px-4 border-b border-[#691823]/20 hidden lg:flex flex-col items-center justify-center w-full bg-white/5">
               <div className="w-full h-32 flex items-center justify-center overflow-hidden">
                 <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-auto" />
               </div>
             </div>
 
             {/* Agent Profile */}
-            <div className="p-5 border-b border-[#691823]/20 bg-[#4d0b13]/10 flex items-center gap-3">
+            <div className="p-5 border-b border-[#691823]/20 bg-white/5 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold">
                 TC
               </div>
@@ -416,7 +416,7 @@ export default function TelecallerDashboard() {
                 <h4 className="text-xs font-bold text-amber-100 truncate">{currentUser?.name || 'Telecaller Agent 01'}</h4>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[9px] text-amber-250/70 font-bold uppercase tracking-wider">
+                  <span className="text-[9px] text-amber-300 font-bold uppercase tracking-wider">
                     {dbConnected ? 'Live Connection' : 'Fallback offline'}
                   </span>
                 </div>
@@ -459,9 +459,9 @@ export default function TelecallerDashboard() {
                 localStorage.removeItem('siva_user');
                 router.push('/');
               }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-amber-250/70 hover:bg-[#c3902c]/10 hover:text-amber-300 border border-[#691823]/30 hover:border-[#691823]/50 transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-amber-300 hover:bg-rose-500/10 hover:text-rose-300 border border-amber-500/30 hover:border-rose-500/40 transition-all cursor-pointer"
             >
-              <LogOut size={15} />
+              <LogOut size={15} className="text-amber-300 shrink-0" />
               Logout Portal
             </button>
           </div>
@@ -655,7 +655,7 @@ export default function TelecallerDashboard() {
       </div>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-gradient-to-r from-[#4d0711] to-[#200206] border-t border-[#691823]/25 p-2 flex items-center justify-around z-40 backdrop-blur-md bg-opacity-95 shadow-2xl">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#4d0711] border-t border-[#691823]/25 p-2 flex items-center justify-around z-40 backdrop-blur-md bg-opacity-95 shadow-2xl">
         {navigationItems.map(item => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;

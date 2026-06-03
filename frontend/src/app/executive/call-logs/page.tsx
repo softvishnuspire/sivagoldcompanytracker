@@ -68,22 +68,22 @@ export default function CallLogsPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn text-slate-800">
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">Call Logs</h1>
-        <p className="text-slate-400 text-sm mt-1">Review histories of telephonic interactions and client notes.</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Call Logs</h1>
+        <p className="text-slate-500 text-sm mt-1">Review histories of telephonic interactions and client notes.</p>
       </div>
 
-      <div className="bg-[#3d1510]/20 border border-amber-500/10 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
         {logs.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 font-mono text-sm">
+          <div className="p-12 text-center text-slate-400 font-medium text-sm">
             No contact calls recorded in your active leads yet.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-amber-500/10 bg-[#3d1510]/40 text-amber-500 font-mono text-xs uppercase tracking-wider">
+                <tr className="border-b border-slate-200 bg-slate-50/50 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                   <th className="px-6 py-4 font-semibold">Time & Date</th>
                   <th className="px-6 py-4 font-semibold">Lead ID</th>
                   <th className="px-6 py-4 font-semibold">Customer Name</th>
@@ -92,20 +92,20 @@ export default function CallLogsPage() {
                   <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-amber-500/5 text-sm">
+              <tbody className="divide-y divide-slate-100 text-sm">
                 {logs.map((log, idx) => (
-                  <tr key={idx} className="hover:bg-[#471a15]/20 transition-colors">
-                    <td className="px-6 py-4 text-slate-400 text-xs font-mono">
+                  <tr key={idx} className="hover:bg-slate-50/60 transition-colors border-b border-slate-100">
+                    <td className="px-6 py-4 text-slate-500 text-xs font-mono">
                       {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
-                    <td className="px-6 py-4 font-mono text-slate-300 text-xs">{log.leadNumber || log.leadId.slice(0, 8)}</td>
-                    <td className="px-6 py-4 font-medium text-slate-100">{log.customerName}</td>
-                    <td className="px-6 py-4 font-mono text-slate-300 text-xs">{log.mobile}</td>
-                    <td className="px-6 py-4 text-slate-300 font-sans max-w-xs truncate">{log.notes}</td>
+                    <td className="px-6 py-4 font-mono text-slate-600 text-xs">{log.leadNumber || log.leadId.slice(0, 8)}</td>
+                    <td className="px-6 py-4 font-bold text-slate-800">{log.customerName}</td>
+                    <td className="px-6 py-4 font-mono text-slate-500 text-xs">{log.mobile}</td>
+                    <td className="px-6 py-4 text-slate-650 font-sans max-w-xs truncate">{log.notes}</td>
                     <td className="px-6 py-4 text-right">
                       <Link 
                         href={`/executive/lead/${log.leadId}`}
-                        className="px-2.5 py-1 rounded bg-[#3d1510]/50 border border-amber-500/20 text-amber-400 text-xs font-mono hover:bg-amber-500/10 transition-colors"
+                        className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 text-[#c3902c] font-bold text-xs tracking-wider transition-all"
                       >
                         VIEW LEAD
                       </Link>

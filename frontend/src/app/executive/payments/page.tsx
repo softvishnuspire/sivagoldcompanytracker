@@ -104,23 +104,24 @@ export default function PaymentsPage() {
   });
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn text-slate-800">
       
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">Payments Registry</h1>
-        <p className="text-slate-400 text-sm mt-1">Review disbursed funds, balance settlements, and financial tracking details.</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Payments Registry</h1>
+        <p className="text-slate-500 text-sm mt-1">Review disbursed funds, balance settlements, and financial tracking details.</p>
       </div>
 
-      <div className="bg-[#3d1510]/20 border border-amber-500/10 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
         {paymentList.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 font-mono text-sm">
+          <div className="p-12 text-center text-slate-400 font-medium text-sm">
             No payment records found. Run the payout steps in lead processing to record transactions.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-amber-500/10 bg-[#3d1510]/40 text-amber-500 font-mono text-xs uppercase tracking-wider">
+                <tr className="border-b border-slate-200 bg-slate-50/50 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                   <th className="px-6 py-4 font-semibold">Lead ID</th>
                   <th className="px-6 py-4 font-semibold">Customer Name</th>
                   <th className="px-6 py-4 font-semibold">Loan Amount</th>
@@ -132,25 +133,25 @@ export default function PaymentsPage() {
                   <th className="px-6 py-4 font-semibold text-right">Link</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-amber-500/5 text-sm">
+              <tbody className="divide-y divide-slate-100 text-sm">
                 {paymentList.map((pay, index) => (
-                  <tr key={index} className="hover:bg-[#471a15]/20 transition-colors">
-                    <td className="px-6 py-4 font-mono text-slate-300 text-xs truncate max-w-[120px]">{pay.leadNumber || pay.leadId.slice(0, 8)}</td>
-                    <td className="px-6 py-4 font-medium text-slate-100">{pay.customerName}</td>
-                    <td className="px-6 py-4 font-mono text-slate-300 text-xs">₹{pay.loanAmount.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 font-mono text-slate-300 text-xs">₹{pay.balanceAmount.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 font-mono text-slate-300 text-xs font-semibold text-amber-400">₹{pay.totalPaid.toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 font-mono text-slate-400 text-xs">{pay.transactionNumber}</td>
-                    <td className="px-6 py-4 text-slate-400 text-xs">{pay.paymentDate}</td>
+                  <tr key={index} className="hover:bg-slate-50/60 transition-colors border-b border-slate-100">
+                    <td className="px-6 py-4 font-mono text-slate-600 text-xs truncate max-w-[120px]">{pay.leadNumber || pay.leadId.slice(0, 8)}</td>
+                    <td className="px-6 py-4 font-bold text-slate-800">{pay.customerName}</td>
+                    <td className="px-6 py-4 font-mono text-slate-600 text-xs">₹{pay.loanAmount.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 font-mono text-slate-600 text-xs">₹{pay.balanceAmount.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 font-mono text-slate-750 font-bold">₹{pay.totalPaid.toLocaleString('en-IN')}</td>
+                    <td className="px-6 py-4 font-mono text-slate-500 text-xs">{pay.transactionNumber}</td>
+                    <td className="px-6 py-4 text-slate-500 text-xs">{pay.paymentDate}</td>
                     <td className="px-6 py-4">
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono border uppercase bg-amber-500/10 text-amber-400 border-amber-500/20">
+                      <span className="inline-block px-2.5 py-0.5 rounded-lg text-[9px] font-bold border uppercase bg-amber-100 text-amber-700 border-amber-200">
                         {pay.status.replace(/_/g, ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <Link 
                         href={`/executive/lead/${pay.leadId}`}
-                        className="px-2.5 py-1 rounded bg-[#3d1510]/50 border border-amber-500/20 text-amber-400 text-xs font-mono hover:bg-amber-500/10 transition-colors"
+                        className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 text-[#c3902c] font-bold text-xs tracking-wider transition-all"
                       >
                         VIEW ➔
                       </Link>
@@ -161,8 +162,6 @@ export default function PaymentsPage() {
             </table>
           </div>
         )}
-      </div>
-
     </div>
   );
 }
