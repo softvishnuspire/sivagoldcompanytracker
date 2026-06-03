@@ -15,21 +15,23 @@ import {
   Menu,
   X,
   Phone,
-  Coins
+  Coins,
+  Clock
 } from 'lucide-react';
 import { Lead, LeadStatus, DashboardStats, Followup } from './types';
-
-
 // Import components
 import StatsOverview from './components/StatsOverview';
 import LeadForm from './components/LeadForm';
 import LeadList from './components/LeadList';
 import FollowupList from './components/FollowupList';
 import ReportsView from './components/ReportsView';
+import PendingFollowupsList from './components/PendingFollowupsList';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function TelecallerDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'pending-followups' | 'reports'>('dashboard');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -168,16 +170,33 @@ export default function TelecallerDashboard() {
 
   const fetchLeads = async () => {
     try {
+<<<<<<< HEAD
       const res = await authenticatedFetch('http://localhost:5000/api/telecaller/leads');
       if (!res.ok) {
         throw new Error('Failed to fetch leads');
+=======
+      const response = await fetch(`${API_BASE}/leads`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch leads from backend API');
+      }
+      const dbLeads = await response.json();
+
+      if (dbLeads) {
+        const mapped = dbLeads.map(mapDbToLead);
+        setLeads(mapped);
+        setDbConnected(true);
+>>>>>>> origin/main
       }
       const dbLeads = await res.json();
       const mapped = dbLeads.map(mapDbToLead);
       setLeads(mapped);
       setDbConnected(true);
     } catch (err) {
+<<<<<<< HEAD
       console.error('Fetch leads failed:', err);
+=======
+      console.warn('Backend fetch leads failed. Falling back to local storage/mock data.', err);
+>>>>>>> origin/main
       setDbConnected(false);
       setLeads([]);
     }
@@ -226,6 +245,7 @@ export default function TelecallerDashboard() {
   };
 
   const handleSaveLead = async (formData: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
+<<<<<<< HEAD
     try {
       let res;
       if (formData.id) {
@@ -268,6 +288,81 @@ export default function TelecallerDashboard() {
             documents: formData.documents
           })
         });
+=======
+    const telecallerId = currentUser?.id || 'mock-uuid-tc-agent-1';
+
+    if (dbConnected) {
+      try {
+        if (formData.id) {
+          // 1. Editing mode
+          const response = await fetch(`${API_BASE}/leads/${formData.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              customer_name: formData.customerName,
+              mobile: formData.mobile,
+              alternate_mobile: formData.alternateMobile,
+              address: formData.address,
+              district: formData.district,
+              gold_weight: formData.goldWeight,
+              gold_type: formData.goldType,
+              estimated_value: formData.estimatedValue,
+              bank_name: formData.bankName,
+              branch_name: formData.branchName,
+              loan_account_number: formData.loanAccountNumber,
+              loan_amount: formData.loanAmount,
+              current_status: formData.status,
+              telecaller_id: telecallerId
+            })
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Failed to update lead');
+          }
+        } else {
+          // 2. Creation mode
+          const response = await fetch(`${API_BASE}/leads`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              customer_name: formData.customerName,
+              mobile: formData.mobile,
+              alternate_mobile: formData.alternateMobile,
+              address: formData.address,
+              district: formData.district,
+              gold_weight: formData.goldWeight,
+              gold_type: formData.goldType,
+              estimated_value: formData.estimatedValue,
+              bank_name: formData.bankName,
+              branch_name: formData.branchName,
+              loan_account_number: formData.loanAccountNumber,
+              loan_amount: formData.loanAmount,
+              current_status: 'CUSTOMER_DETAILS_CREATED',
+              telecaller_id: telecallerId,
+              documents: formData.documents
+            })
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Failed to create lead');
+          }
+        }
+
+        // Refresh leads
+        await fetchLeads();
+        setEditingLead(null);
+        setActiveTab('leads-list');
+        return;
+
+      } catch (err) {
+        console.error('Database save lead failed. Saving to fallback storage.', err);
+>>>>>>> origin/main
       }
 
       if (!res.ok) {
@@ -288,6 +383,7 @@ export default function TelecallerDashboard() {
       const leadToUpdate = leads.find(l => l.id === leadId);
       if (!leadToUpdate) return;
 
+<<<<<<< HEAD
       const res = await authenticatedFetch(`http://localhost:5000/api/telecaller/leads/${leadId}`, {
         method: 'PUT',
         body: JSON.stringify({
@@ -309,6 +405,31 @@ export default function TelecallerDashboard() {
 
       if (!res.ok) {
         throw new Error('Failed to update lead status');
+=======
+    if (dbConnected) {
+      try {
+        const response = await fetch(`${API_BASE}/leads/${leadId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            current_status: status,
+            remarks: remarks || `Status updated to ${status}`,
+            telecaller_id: telecallerId
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to update status');
+        }
+
+        await fetchLeads();
+        return;
+      } catch (err) {
+        console.error('Database update status failed.', err);
+>>>>>>> origin/main
       }
 
       await fetchLeads();
@@ -325,8 +446,34 @@ export default function TelecallerDashboard() {
         body: JSON.stringify({ date, remarks })
       });
 
+<<<<<<< HEAD
       if (!res.ok) {
         throw new Error('Failed to add followup');
+=======
+    if (dbConnected) {
+      try {
+        const response = await fetch(`${API_BASE}/leads/${leadId}/followups`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            date,
+            remarks,
+            telecaller_id: telecallerId
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to add followup');
+        }
+
+        await fetchLeads();
+        return;
+      } catch (err) {
+        console.error('Database add followup failed.', err);
+>>>>>>> origin/main
       }
 
       await fetchLeads();
@@ -343,8 +490,33 @@ export default function TelecallerDashboard() {
         body: JSON.stringify({ remarks })
       });
 
+<<<<<<< HEAD
       if (!res.ok) {
         throw new Error('Failed to complete followup');
+=======
+    if (dbConnected) {
+      try {
+        const response = await fetch(`${API_BASE}/leads/${leadId}/followups/${followupId}/complete`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            remarks,
+            telecaller_id: telecallerId
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Failed to complete followup');
+        }
+
+        await fetchLeads();
+        return;
+      } catch (err) {
+        console.error('Database complete followup failed.', err);
+>>>>>>> origin/main
       }
 
       await fetchLeads();
@@ -370,6 +542,7 @@ export default function TelecallerDashboard() {
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'leads-list' as const, label: 'Lead Management', icon: ListTodo },
     { id: 'add-lead' as const, label: 'Add Lead', icon: PlusCircle },
+    { id: 'pending-followups' as const, label: 'Pending Followups', icon: Clock },
     { id: 'follow-ups' as const, label: 'Follow-ups', icon: PhoneCall },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 }
   ];
@@ -638,6 +811,15 @@ export default function TelecallerDashboard() {
                   leads={leads}
                   onCompleteFollowup={handleCompleteFollowup}
                   onSimulateCall={triggerCallSimulationFromFollowup}
+                />
+              </div>
+            )}
+
+            {activeTab === 'pending-followups' && (
+              <div className="animate-fadeIn">
+                <PendingFollowupsList
+                  leads={leads}
+                  onEdit={handleEditLeadTrigger}
                 />
               </div>
             )}

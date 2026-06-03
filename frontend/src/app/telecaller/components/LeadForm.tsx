@@ -207,6 +207,31 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
     });
   };
 
+  const handleSaveAsPendingFollowup = () => {
+    if (!validateStep(1)) return;
+
+    onSave({
+      id: editingLead?.id,
+      customerName: formData.customerName.trim(),
+      mobile: formData.mobile.trim(),
+      alternateMobile: formData.alternateMobile.trim() || undefined,
+      address: formData.address.trim(),
+      district: formData.district,
+      goldWeight: parseFloat(formData.goldWeight) || 0,
+      goldType: formData.goldType || 'Jewelry (22K)',
+      estimatedValue: parseFloat(formData.estimatedValue) || 0,
+      bankName: formData.bankName.trim() || '',
+      branchName: formData.branchName.trim() || '',
+      loanAmount: parseFloat(formData.loanAmount) || 0,
+      loanAccountNumber: formData.loanAccountNumber.trim() || '',
+      status: 'FOLLOW-UP',
+      telecallerId: editingLead?.telecallerId || 'TC-01',
+      rmId: editingLead?.rmId,
+      executiveId: editingLead?.executiveId,
+      documents: []
+    });
+  };
+
   const steps = [
     { num: 1, label: 'Customer', icon: User },
     { num: 2, label: 'Gold Details', icon: Coins },
@@ -640,6 +665,15 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
           </div>
 
           <div className="flex gap-2">
+            {activeStep === 1 && (
+              <button
+                type="button"
+                onClick={handleSaveAsPendingFollowup}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-brand-copper/30 bg-brand-mahogany/80 text-brand-silver hover:bg-brand-copper/20 transition-colors shadow-lg cursor-pointer"
+              >
+                Add to pending follow ups
+              </button>
+            )}
             {activeStep < 4 ? (
               <button
                 type="button"

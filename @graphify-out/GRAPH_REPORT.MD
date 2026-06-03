@@ -47,12 +47,18 @@ graph TD
     TelecallerPage --> LeadForm["components/LeadForm.tsx"]
     TelecallerPage --> LeadList["components/LeadList.tsx"]
     TelecallerPage --> FollowupList["components/FollowupList.tsx"]
+    TelecallerPage --> PendingFollowupsList["components/PendingFollowupsList.tsx"]
     TelecallerPage --> ReportsView["components/ReportsView.tsx"]
     TelecallerPage --> MockData["mockData.ts"]
     TelecallerPage --> Types["types.ts"]
     
+    %% Backend Flow
+    TelecallerPage --> ExpressAPI["Express Backend (API)"]
+    ExpressAPI --> SupabaseDB[("Supabase DB")]
+    
     backend --> Node.js
     backend --> Express
+    Express --> ExpressAPI
 ```
 
 ## Directory Structure Details
@@ -64,8 +70,9 @@ graph TD
     - `page.tsx` - Main controller layout (handles tabs, localStorage persistence, states).
     - `types.ts` - Models for Leads, Followups, and Documents.
     - `mockData.ts` - Initial storage seeds.
-    - `components/` - Subcomponents for Stats cards, CRUD Forms, searchable Lists, Call Scheduler, and SVG Daily/Monthly Reports.
+    - `components/` - Subcomponents for Stats cards, CRUD Forms, searchable Lists, Call Scheduler, Pending Followups List, and SVG Daily/Monthly Reports.
   - `src/app/executive/page.tsx` - Executive dashboard route.
   - `.env.local` - Local environment variables file.
-- **Backend**: Express API server initialized at `backend/index.js` (runs on default port 5000).
+- **Backend**: Express API server initialized at `backend/index.js` (runs on default port 5000). Exposes endpoints for Lead CRUD, Status updates, and Follow-ups, communicating directly with Supabase.
   - `.env` - Server environment variables file.
+
