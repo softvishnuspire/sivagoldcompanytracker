@@ -617,12 +617,14 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
-// Import and Register Routers for auth and executive
+// Import and Register Routers for auth, executive and md
 const authRoutes = require('./routes/auth');
 const executiveRoutes = require('./routes/executive');
+const mdRoutes = require('./routes/md');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/executive', executiveRoutes);
+app.use('/api/md', mdRoutes);
 
 // =========================================================================
 // TELECALLER ENDPOINTS

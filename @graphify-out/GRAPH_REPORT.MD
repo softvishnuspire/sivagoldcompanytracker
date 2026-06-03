@@ -2,8 +2,8 @@
 
 ## Overview
 This repository is configured with two main independent workspaces implementing the **Shiva Gold Company Management System**:
-1. `frontend/` - Next.js (App Router) project with TypeScript, Tailwind CSS v4, and dynamic transition animations.
-2. `backend/` - Node.js project running an Express server with Supabase PostgreSQL connection, JWT Authentication, and RBAC middleware.
+1. `frontend/` - Next.js (App Router) project with TypeScript, Tailwind CSS v4, Recharts analytics, and dynamic transition animations.
+2. `backend/` - Node.js project running an Express server with Supabase PostgreSQL connection, JWT Authentication, exceljs/pdfkit reports compilers, and RBAC middleware.
 
 ## Custom Theme Palette
 We have configured a brand-specific luxury color palette from Coolors:
@@ -40,7 +40,7 @@ We have added the environment variables file for Port and Supabase connection pa
 - A root-level `.gitignore` excludes build outputs, Node modules, and credentials environment files.
 - Remote repository link: `https://github.com/softvishnuspire/sivagoldcompanytracker.git`.
 
-## Executive & Telecaller Dashboard Architecture Graph
+## Executive, Telecaller & MD Dashboard Architecture Graph
 ```mermaid
 graph TD
     siva-tracker --> frontend
@@ -48,11 +48,14 @@ graph TD
     frontend --> Next.js
     frontend --> TypeScript
     frontend --> Tailwind_CSS
+    frontend --> Recharts
     
     %% Portal Routing
     frontend --> RootPage["src/app/page.tsx (Landing Portal Router)"]
     RootPage --> TelecallerPage
     RootPage --> Login["login/page.tsx"]
+    RootPage --> MDPage["md/page.tsx"]
+    RootPage --> RMPage["rm/page.tsx"]
     
     %% Telecaller Panel Breakdown
     TelecallerPage["src/app/telecaller/page.tsx"] --> StatsOverview["components/StatsOverview.tsx"]
@@ -75,8 +78,13 @@ graph TD
     Layout --> Gallery["executive/gallery/page.tsx"]
     Layout --> Reports["executive/reports/page.tsx"]
     
+    %% MD Panel Breakdown
+    MDPage --> MDRechartsLine["Recharts LineChart (Revenue Trend)"]
+    MDPage --> MDRechartsBar["Recharts BarChart (Monthly Comparison)"]
+    
     %% Backend Flow
     TelecallerPage --> ExpressAPI["Express Backend (API)"]
+    MDPage --> ExpressAPI
     APIClient["lib/api.ts"] --> ExpressAPI
     
     backend --> Node.js
@@ -87,8 +95,15 @@ graph TD
     Index --> RateLimit["Limiter & Helmet"]
     Index --> AuthRoutes["routes/auth.js"]
     Index --> ExecRoutes["routes/executive.js"]
-    ExecRoutes --> AuthMiddleware["middleware/auth.js"]
-    ExecRoutes --> SupabaseDB["db/supabase.js"]
+    Index --> MDRoutes["routes/md.js"]
+    
+    MDRoutes --> AuthMiddleware["middleware/auth.js"]
+    MDRoutes --> SupabaseDB["db/supabase.js"]
+    MDRoutes --> PDFKit["pdfkit (PDF Export)"]
+    MDRoutes --> ExcelJS["exceljs (Excel Export)"]
+    
+    ExecRoutes --> AuthMiddleware
+    ExecRoutes --> SupabaseDB
     
     SupabaseDB --> Postgres[(Supabase PostgreSQL)]
     ExecRoutes --> S3Storage[(Supabase Storage Buckets)]
@@ -98,39 +113,23 @@ graph TD
 ## Directory Structure Details
 
 ### Backend:
-- `backend/index.js` - Server entry point integrating Helmet, CORS, Rate Limiters, and Router handlers. Includes database seed trigger route.
+- `backend/index.js` - Server entry point integrating Helmet, CORS, Rate Limiters, and Router handlers. Registers auth routes, executive routes, and the new `/api/md` routes.
+- `backend/routes/auth.js` - Express router defining `/api/auth/login` and `/api/auth/me` profile endpoints.
+- `backend/routes/executive.js` - Contains endpoints managing case pipelines, file uploads to Supabase buckets, and timeline logs.
+- `backend/routes/md.js` - Exposes MD analytics queries, details browser, approval/rejection operations, performance aggregators, and formatted PDF/Excel report downloads.
 - `backend/db/supabase.js` - Exposes the Supabase client connector using local environmental keys.
 - `backend/middleware/auth.js` - Implements JWT token authorization verify checks and Role-Based Access Control (RBAC).
-- `backend/routes/auth.js` - Express router defining `/api/auth/login` and `/api/auth/me` profile endpoints.
-- `backend/routes/executive.js` - Contains the 14 core endpoints managing case pipeline steps, uploads to Supabase buckets (configured as lowercase: `loan-documents`, `agreements`, `payment-proofs`, `gold-images`), and timeline logs.
 - `backend/seed.js` - Helper script to populate default users (MD, RM, Executives, Telecaller) with bcrypt hashed passwords.
 - `backend/.env` - Server environment variables file.
 
 ### Frontend:
-- `frontend/src/lib/api.ts` - Centralized fetch client injecting the JWT authorization bearer token header.
-- `frontend/src/app/page.tsx` - Main pre-existing login portal at root `/`, updated to use secure Express backend APIs.
+- `frontend/src/lib/api.ts` - Centralized fetch client injecting the JWT authorization bearer token header and handling session evictions.
+- `frontend/src/app/page.tsx` - Main pre-existing login portal at root `/`.
 - `frontend/src/app/login/page.tsx` - Client redirection route routing `/login` accesses back to root `/`.
-- `frontend/src/app/md/page.tsx` - Managing Director dashboard route.
+- `frontend/src/app/md/page.tsx` - Managing Director dashboard route containing full tabular performance trackers, fund approvals, case timelines, and Recharts line/bar analytics.
 - `frontend/src/app/rm/page.tsx` - Relationship Manager dashboard route.
-- `frontend/src/app/telecaller/` - Telecaller Dashboard workspace:
-  - `page.tsx` - Main controller layout (handles tabs, localStorage persistence, states).
-  - `types.ts` - Models for Leads, Followups, and Documents.
-  - `mockData.ts` - Initial storage seeds.
-  - `components/` - Subcomponents for Stats cards, CRUD Forms, searchable Lists, Call Scheduler, Pending Followups List, Documents View, and SVG Daily/Monthly Reports.
-- `frontend/src/app/executive/` - Executive Dashboard workspace:
-  - `layout.tsx` - Shared layout containing responsive left navigation menus and session validation controls.
-  - `page.tsx` - Portal dashboard summarizing metric statistics and active operational shortcuts.
-  - `assigned/page.tsx` - Assigned leads overview lists.
-  - `lead/[id]/page.tsx` - Detailed lead interface containing sequential status action forms, documents catalog, bottom quick action panels, and timeline journey logs.
-  - `payments/page.tsx` - Payment registry ledger lists.
-  - `documents/page.tsx` - Documents preview and download listings.
-  - `gallery/page.tsx` - Gold ornament gallery images grid with click-to-preview lightbox modal.
-  - `reports/page.tsx` - Reports page displaying completion rates, total collection volumes, and time-frame filtering cards.
-  - `visits/page.tsx` - Appointments scheduling list.
-  - `in-progress/page.tsx` - Ongoing cases tracking table.
-  - `completed/page.tsx` - Closed cases history list.
-  - `call-logs/page.tsx` - Contact call interactions registry log.
-  - `profile/page.tsx` - Personal credentials and branch access values.
+- `frontend/src/app/telecaller/` - Telecaller Dashboard workspace.
+- `frontend/src/app/executive/` - Executive Dashboard workspace.
 - `frontend/.env.local` - Local environment variables file.
 
 ## Recent Fixes
