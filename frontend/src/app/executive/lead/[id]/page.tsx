@@ -596,7 +596,11 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                           </div>
                           <div className="flex justify-between items-center text-xs font-mono">
                             <span className="text-slate-500">Request Date:</span>
-                            <span className="text-slate-650">{new Date(pendingFundRequest.created_at).toLocaleDateString()}</span>
+                            <span className="text-slate-650">
+                              {pendingFundRequest.created_at 
+                                ? new Date(pendingFundRequest.created_at).toLocaleDateString() 
+                                : 'N/A'}
+                            </span>
                           </div>
                         </div>
                       </>
