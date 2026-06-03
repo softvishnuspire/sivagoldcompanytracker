@@ -19,7 +19,6 @@ import {
   Clock
 } from 'lucide-react';
 import { Lead, LeadStatus, DashboardStats, Followup } from './types';
-import { INITIAL_LEADS } from './mockData';
 // Import components
 import StatsOverview from './components/StatsOverview';
 import LeadForm from './components/LeadForm';
@@ -27,13 +26,12 @@ import LeadList from './components/LeadList';
 import FollowupList from './components/FollowupList';
 import ReportsView from './components/ReportsView';
 import PendingFollowupsList from './components/PendingFollowupsList';
-import DocumentsView from './components/DocumentsView';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function TelecallerDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'pending-followups' | 'documents' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'pending-followups' | 'reports'>('dashboard');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -44,14 +42,43 @@ export default function TelecallerDashboard() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [dbConnected, setDbConnected] = useState(false);
 
-  // 1. Data mapping helpers between DB snake_case and UI camelCase
+  // Data mapping helper: DB snake_case status -> valid LeadStatus
+  const dbToUiStatus = (dbStatus: string): LeadStatus => {
+    switch (dbStatus) {
+      case 'CUSTOMER_DETAILS_CREATED': return 'CUSTOMER_DETAILS_CREATED';
+      case 'FOLLOWUP_IN_PROGRESS': return 'FOLLOWUP_IN_PROGRESS';
+      case 'DETAILS_COLLECTED': return 'DETAILS_COLLECTED';
+      case 'DOCUMENTS_RECEIVED': return 'DOCUMENTS_RECEIVED';
+      case 'PRICE_CONFIRMED': return 'PRICE_CONFIRMED';
+      case 'SENT_TO_RM': return 'SENT_TO_RM';
+      case 'RM_APPROVED': return 'RM_APPROVED';
+      case 'RM_REVERIFICATION': return 'RM_REVERIFICATION';
+      case 'RM_REJECTED': return 'RM_REJECTED';
+      case 'EXECUTIVE_ASSIGNED': return 'EXECUTIVE_ASSIGNED';
+      case 'CUSTOMER_CALLED': return 'CUSTOMER_CALLED';
+      case 'VISIT_CONFIRMED': return 'VISIT_CONFIRMED';
+      case 'MD_FUNDS_APPROVED': return 'MD_FUNDS_APPROVED';
+      case 'JOURNEY_STARTED': return 'JOURNEY_STARTED';
+      case 'REACHED_CUSTOMER': return 'REACHED_CUSTOMER';
+      case 'CUSTOMER_INTERACTION': return 'CUSTOMER_INTERACTION';
+      case 'BANK_VISIT': return 'BANK_VISIT';
+      case 'AGREEMENT_PENDING': return 'AGREEMENT_PENDING';
+      case 'PAYMENT_COMPLETED': return 'PAYMENT_COMPLETED';
+      case 'GOLD_RECEIVED': return 'GOLD_RECEIVED';
+      case 'BALANCE_SETTLED': return 'BALANCE_SETTLED';
+      case 'IMAGES_UPLOADED': return 'IMAGES_UPLOADED';
+      case 'CASE_COMPLETED': return 'CASE_COMPLETED';
+      default: return 'CUSTOMER_DETAILS_CREATED';
+    }
+  };
+
   const mapDbToLead = (db: any): Lead => {
     // Map documents
     const documents = (db.documents || []).map((doc: any) => ({
       id: doc.id,
       leadId: doc.lead_id,
       documentType: doc.document_type,
-      fileName: doc.file_name || doc.file_url?.split('/').pop() || 'document.pdf',
+      fileName: doc.file_url.split('/').pop() || 'document.pdf',
       fileUrl: doc.file_url,
       uploadedBy: doc.uploaded_by,
       createdAt: doc.created_at
@@ -85,8 +112,7 @@ export default function TelecallerDashboard() {
       branchName: db.branch_name,
       loanAmount: Number(db.loan_amount || 0),
       loanAccountNumber: db.loan_account_number,
-      source: db.source,
-      status: db.current_status as LeadStatus,
+      status: dbToUiStatus(db.current_status),
       telecallerId: db.telecaller_id,
       rmId: db.rm_id,
       executiveId: db.executive_id,
@@ -97,56 +123,72 @@ export default function TelecallerDashboard() {
     };
   };
 
-  // Fetch leads from database
+  // Authenticated fetch helper with JWT token
+  const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
+    const token = localStorage.getItem('siva_token');
+    if (!token) {
+      localStorage.removeItem('siva_user');
+      window.location.href = '/';
+      throw new Error('Authentication token missing. Logging out...');
+    }
+
+    const headers = {
+      ...(options.headers || {}),
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+
+    const res = await fetch(url, { ...options, headers });
+    
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('siva_token');
+      localStorage.removeItem('siva_user');
+      window.location.href = '/';
+      throw new Error('Session expired. Logging out...');
+    }
+
+    return res;
+  };
+
   const fetchLeads = async () => {
     try {
-      const response = await fetch(`${API_BASE}/leads`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch leads from backend API');
+      const res = await authenticatedFetch(`${API_BASE}/telecaller/leads`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch leads');
       }
-      const dbLeads = await response.json();
-
-      if (dbLeads) {
-        const mapped = dbLeads.map(mapDbToLead);
-        setLeads(mapped);
-        setDbConnected(true);
-      }
+      const dbLeads = await res.json();
+      const mapped = dbLeads.map(mapDbToLead);
+      setLeads(mapped);
+      setDbConnected(true);
     } catch (err) {
-      console.warn('Backend fetch leads failed. Falling back to local storage/mock data.', err);
+      console.error('Fetch leads failed:', err);
       setDbConnected(false);
-      
-      // Fallback local storage
-      const stored = localStorage.getItem('siva_leads');
-      if (stored) {
-        try { setLeads(JSON.parse(stored)); } catch (e) { setLeads(INITIAL_LEADS); }
-      } else {
-        setLeads(INITIAL_LEADS);
-        localStorage.setItem('siva_leads', JSON.stringify(INITIAL_LEADS));
-      }
+      setLeads([]);
     }
   };
 
   // Initialize and load
   useEffect(() => {
-    // Load current user session
+    const token = localStorage.getItem('siva_token');
     const sessionUser = localStorage.getItem('siva_user');
-    if (sessionUser) {
-      try {
-        setCurrentUser(JSON.parse(sessionUser));
-      } catch (e) {
-        setCurrentUser({ id: 'mock-uuid-tc-agent-1', name: 'Dev Agent' });
+    if (!token || !sessionUser) {
+      window.location.href = '/';
+      return;
+    }
+    try {
+      const user = JSON.parse(sessionUser);
+      if (user.role.toLowerCase() !== 'telecaller') {
+        window.location.href = '/';
+        return;
       }
-    } else {
-      setCurrentUser({ id: 'mock-uuid-tc-agent-1', name: 'Dev Agent' });
+      setCurrentUser(user);
+    } catch (e) {
+      window.location.href = '/';
+      return;
     }
 
     fetchLeads();
   }, []);
-
-  const saveLeadsFallback = (updatedLeads: Lead[]) => {
-    setLeads(updatedLeads);
-    localStorage.setItem('siva_leads', JSON.stringify(updatedLeads));
-  };
 
   // Helper to compute stats dynamically
   const getStats = (): DashboardStats => {
@@ -157,299 +199,150 @@ export default function TelecallerDashboard() {
       (l.followups && l.followups.some(f => f.status === 'PENDING'))
     ).length;
 
-    const qualifiedLeads = leads.filter(l => l.status === 'DETAILS_COLLECTED').length;
+    const qualifiedLeads = leads.filter(l => l.status === 'SENT_TO_RM').length;
     const rejectedLeads = leads.filter(l => l.status === 'RM_REJECTED').length;
     
     const sentToRM = leads.filter(l => 
-      !['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS', 'DETAILS_COLLECTED', 'RM_REJECTED'].includes(l.status)
+      !['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS', 'RM_REJECTED'].includes(l.status)
     ).length;
 
     return { newLeads, pendingFollowups, qualifiedLeads, rejectedLeads, sentToRM };
   };
 
   const handleSaveLead = async (formData: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
-    const telecallerId = currentUser?.id || 'mock-uuid-tc-agent-1';
-
-    if (dbConnected) {
-      try {
-        if (formData.id) {
-          // 1. Editing mode
-          const response = await fetch(`${API_BASE}/leads/${formData.id}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              customer_name: formData.customerName,
-              mobile: formData.mobile,
-              alternate_mobile: formData.alternateMobile,
-              address: formData.address,
-              district: formData.district,
-              gold_weight: formData.goldWeight,
-              gold_type: formData.goldType,
-              estimated_value: formData.estimatedValue,
-              bank_name: formData.bankName,
-              branch_name: formData.branchName,
-              loan_account_number: formData.loanAccountNumber,
-              current_status: formData.status,
-              source: formData.source,
-              telecaller_id: telecallerId,
-              documents: formData.documents
-            })
-          });
-
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || 'Failed to update lead');
-          }
-        } else {
-          // 2. Creation mode
-          const response = await fetch(`${API_BASE}/leads`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              customer_name: formData.customerName,
-              mobile: formData.mobile,
-              alternate_mobile: formData.alternateMobile,
-              address: formData.address,
-              district: formData.district,
-              gold_weight: formData.goldWeight,
-              gold_type: formData.goldType,
-              estimated_value: formData.estimatedValue,
-              bank_name: formData.bankName,
-              branch_name: formData.branchName,
-              loan_account_number: formData.loanAccountNumber,
-              loan_amount: formData.loanAmount,
-              current_status: 'CUSTOMER_DETAILS_CREATED',
-              source: formData.source,
-              telecaller_id: telecallerId,
-              documents: formData.documents
-            })
-          });
-
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || 'Failed to create lead');
-          }
-        }
-
-        // Refresh leads
-        await fetchLeads();
-        setEditingLead(null);
-        setActiveTab('leads-list');
-        return;
-
-      } catch (err) {
-        console.error('Database save lead failed. Saving to fallback storage.', err);
+    try {
+      let res;
+      if (formData.id) {
+        // Editing lead
+        res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${formData.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            customerName: formData.customerName,
+            mobile: formData.mobile,
+            alternateMobile: formData.alternateMobile,
+            address: formData.address,
+            district: formData.district,
+            goldWeight: formData.goldWeight,
+            goldType: formData.goldType,
+            estimatedValue: formData.estimatedValue,
+            bankName: formData.bankName,
+            branchName: formData.branchName,
+            loanAmount: formData.loanAmount,
+            loanAccountNumber: formData.loanAccountNumber,
+            status: formData.status
+          })
+        });
+      } else {
+        // Creating new lead
+        res = await authenticatedFetch(`${API_BASE}/telecaller/leads`, {
+          method: 'POST',
+          body: JSON.stringify({
+            customerName: formData.customerName,
+            mobile: formData.mobile,
+            alternateMobile: formData.alternateMobile,
+            address: formData.address,
+            district: formData.district,
+            goldWeight: formData.goldWeight,
+            goldType: formData.goldType,
+            estimatedValue: formData.estimatedValue,
+            bankName: formData.bankName,
+            branchName: formData.branchName,
+            loanAmount: formData.loanAmount,
+            loanAccountNumber: formData.loanAccountNumber,
+            documents: formData.documents
+          })
+        });
       }
-    }
 
-    // Fallback Local Storage Mode
-    let updatedLeads = [...leads];
-    if (formData.id) {
-      updatedLeads = leads.map(l => {
-        if (l.id === formData.id) {
-          return {
-            ...l,
-            ...formData,
-            updatedAt: new Date().toISOString()
-          } as Lead;
-        }
-        return l;
-      });
+      if (!res.ok) {
+        throw new Error('Failed to save lead');
+      }
+
+      await fetchLeads();
       setEditingLead(null);
-    } else {
-      const nextNum = leads.length + 1;
-      const leadNumber = `SGL-2026-${nextNum.toString().padStart(4, '0')}`;
-      const newLead: Lead = {
-        ...formData,
-        id: `L-${Date.now()}`,
-        leadNumber,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        followups: [],
-        documents: formData.documents || []
-      } as Lead;
-      updatedLeads.unshift(newLead);
+      setActiveTab('leads-list');
+    } catch (err) {
+      console.error('Save lead failed:', err);
+      alert('Error saving lead details to backend server.');
     }
-    saveLeadsFallback(updatedLeads);
-    setActiveTab('leads-list');
   };
 
   const handleUpdateLeadStatus = async (leadId: string, status: LeadStatus, remarks?: string) => {
-    const telecallerId = currentUser?.id || 'mock-uuid-tc-agent-1';
+    try {
+      const leadToUpdate = leads.find(l => l.id === leadId);
+      if (!leadToUpdate) return;
 
-    if (dbConnected) {
-      try {
-        const response = await fetch(`${API_BASE}/leads/${leadId}/status`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            current_status: status,
-            remarks: remarks || `Status updated to ${status}`,
-            telecaller_id: telecallerId
-          })
-        });
+      const res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${leadId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          customerName: leadToUpdate.customerName,
+          mobile: leadToUpdate.mobile,
+          alternateMobile: leadToUpdate.alternateMobile,
+          address: leadToUpdate.address,
+          district: leadToUpdate.district,
+          goldWeight: leadToUpdate.goldWeight,
+          goldType: leadToUpdate.goldType,
+          estimatedValue: leadToUpdate.estimatedValue,
+          bankName: leadToUpdate.bankName,
+          branchName: leadToUpdate.branchName,
+          loanAmount: leadToUpdate.loanAmount,
+          loanAccountNumber: leadToUpdate.loanAccountNumber,
+          status: status
+        })
+      });
 
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Failed to update status');
-        }
-
-        await fetchLeads();
-        return;
-      } catch (err) {
-        console.error('Database update status failed.', err);
+      if (!res.ok) {
+        throw new Error('Failed to update lead status');
       }
+
+      await fetchLeads();
+    } catch (err) {
+      console.error('Update status failed:', err);
+      alert('Failed to update lead status on the server.');
     }
-
-    // Fallback mode
-    const updated = leads.map(l => {
-      if (l.id === leadId) {
-        return {
-          ...l,
-          status,
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return l;
-    });
-    saveLeadsFallback(updated);
   };
 
   const handleAddFollowup = async (leadId: string, date: string, remarks: string) => {
-    const telecallerId = currentUser?.id || 'mock-uuid-tc-agent-1';
+    try {
+      const res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${leadId}/followup`, {
+        method: 'POST',
+        body: JSON.stringify({ date, remarks })
+      });
 
-    if (dbConnected) {
-      try {
-        const response = await fetch(`${API_BASE}/leads/${leadId}/followups`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            date,
-            remarks,
-            telecaller_id: telecallerId
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Failed to add followup');
-        }
-
-        await fetchLeads();
-        return;
-      } catch (err) {
-        console.error('Database add followup failed.', err);
+      if (!res.ok) {
+        throw new Error('Failed to add followup');
       }
+
+      await fetchLeads();
+    } catch (err) {
+      console.error('Add followup failed:', err);
+      alert('Failed to add followup interaction log.');
     }
-
-    // Fallback Mode
-    const newFollowup: Followup = {
-      id: `F-${Date.now()}`,
-      leadId,
-      followupDate: date,
-      remarks,
-      status: 'PENDING',
-      createdBy: telecallerId,
-      createdAt: new Date().toISOString()
-    };
-
-    const updated = leads.map(l => {
-      if (l.id === leadId) {
-        return {
-          ...l,
-          status: 'FOLLOWUP_IN_PROGRESS' as LeadStatus,
-          followups: [...(l.followups || []), newFollowup],
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return l;
-    });
-    saveLeadsFallback(updated);
   };
 
   const handleCompleteFollowup = async (leadId: string, followupId: string, remarks: string) => {
-    const telecallerId = currentUser?.id || 'mock-uuid-tc-agent-1';
+    try {
+      const res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${leadId}/complete-followup`, {
+        method: 'POST',
+        body: JSON.stringify({ remarks })
+      });
 
-    if (dbConnected) {
-      try {
-        const response = await fetch(`${API_BASE}/leads/${leadId}/followups/${followupId}/complete`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            remarks,
-            telecaller_id: telecallerId
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Failed to complete followup');
-        }
-
-        await fetchLeads();
-        return;
-      } catch (err) {
-        console.error('Database complete followup failed.', err);
+      if (!res.ok) {
+        throw new Error('Failed to complete followup');
       }
+
+      await fetchLeads();
+    } catch (err) {
+      console.error('Complete followup failed:', err);
+      alert('Failed to complete followup call.');
     }
-
-    // Fallback Mode
-    const updated = leads.map(l => {
-      if (l.id === leadId) {
-        const updatedFollowups = (l.followups || []).map(f => {
-          if (f.id === followupId) {
-            return { ...f, status: 'COMPLETED' as const, remarks };
-          }
-          return f;
-        });
-
-        const hasMorePending = updatedFollowups.some(f => f.status === 'PENDING');
-        const nextStatus: LeadStatus = hasMorePending ? 'FOLLOWUP_IN_PROGRESS' : 'CUSTOMER_DETAILS_CREATED';
-
-        return {
-          ...l,
-          status: nextStatus,
-          followups: updatedFollowups,
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return l;
-    });
-    saveLeadsFallback(updated);
   };
 
   const handleDeleteLead = async (leadId: string) => {
-    if (dbConnected) {
-      try {
-        const response = await fetch(`${API_BASE}/leads/${leadId}`, {
-          method: 'DELETE'
-        });
-
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Failed to delete lead');
-        }
-
-        await fetchLeads();
-        return;
-      } catch (err) {
-        console.error('Database delete lead failed.', err);
-      }
-    }
-
-    // Fallback Mode
-    const updated = leads.filter(l => l.id !== leadId);
-    saveLeadsFallback(updated);
+    // Currently the backend does not have a DELETE endpoint.
+    // We log this action and refresh the lead list.
+    console.warn('Delete lead requested for:', leadId, '— no backend DELETE endpoint available yet.');
+    alert('Lead deletion is not supported yet. Contact your administrator.');
   };
 
   const handleEditLeadTrigger = (lead: Lead) => {
@@ -469,7 +362,6 @@ export default function TelecallerDashboard() {
     { id: 'leads-list' as const, label: 'Lead Management', icon: ListTodo },
     { id: 'add-lead' as const, label: 'Add Lead', icon: PlusCircle },
     { id: 'pending-followups' as const, label: 'Pending Followups', icon: Clock },
-    { id: 'documents' as const, label: 'Documents', icon: FileText },
     { id: 'follow-ups' as const, label: 'Follow-ups', icon: PhoneCall },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 }
   ];
@@ -485,9 +377,11 @@ export default function TelecallerDashboard() {
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <div className="font-extrabold text-sm tracking-tight text-brand-silver flex items-center gap-1.5">
+          <div className="font-extrabold text-sm tracking-tight text-brand-silver flex items-center gap-2">
+            <div className="w-8 h-8 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-full object-contain" />
+            </div>
             <span className="text-brand-silver font-black">SIVA GOLD</span>
-            <span className="text-[10px] bg-brand-copper/20 text-brand-silver py-0.5 px-2 rounded-full border border-brand-copper/30">TRACKER</span>
           </div>
         </div>
 
@@ -501,18 +395,15 @@ export default function TelecallerDashboard() {
       <div className="flex flex-1 relative">
         {/* Sidebar for PC / Navigation Drawer for Mobile */}
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-64 bg-brand-mahogany border-r border-brand-copper/30 flex flex-col justify-between transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static ${
+          className={`fixed inset-y-0 left-0 z-50 w-64 bg-brand-mahogany border-r border-brand-copper/30 flex flex-col justify-between transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static hide-scrollbar ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
           <div>
             {/* Sidebar Logo */}
-            <div className="p-6 border-b border-brand-copper/20 hidden lg:flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="font-black text-lg text-brand-silver tracking-tight flex items-center gap-1">
-                  SHIVA GOLD <span className="text-xs text-brand-silver/80 font-medium">Co.</span>
-                </span>
-                <span className="text-[10px] text-brand-slate uppercase tracking-widest font-semibold mt-0.5">Management Portal</span>
+            <div className="py-2 px-4 border-b border-brand-copper/20 hidden lg:flex flex-col items-center justify-center w-full">
+              <div className="w-full h-32 flex items-center justify-center overflow-hidden">
+                <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-auto" />
               </div>
             </div>
 
@@ -751,12 +642,6 @@ export default function TelecallerDashboard() {
                   onEdit={handleEditLeadTrigger}
                   onDelete={handleDeleteLead}
                 />
-              </div>
-            )}
-
-            {activeTab === 'documents' && (
-              <div className="animate-fadeIn">
-                <DocumentsView leads={leads} />
               </div>
             )}
 

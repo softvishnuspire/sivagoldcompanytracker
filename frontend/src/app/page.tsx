@@ -18,7 +18,7 @@ import {
   Check,
   Info
 } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+
 
 type UserRole = 'telecaller' | 'rm' | 'executive' | 'md';
 
@@ -76,11 +76,15 @@ export default function Home() {
     setLoading(true);
     setNotification(null);
 
-    try {
+      // Send login request to secured backend API
       const res = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password,
+          role: role
+        })
       });
 
       const data = await res.json();
@@ -89,14 +93,10 @@ export default function Home() {
         throw new Error(data.error || 'Invalid credentials or role mismatch.');
       }
 
-      // Check if user role matches the selected role
-      if (data.user.role.toUpperCase() !== role.toUpperCase()) {
-        throw new Error(`Role mismatch. Your account is registered as ${data.user.role.toUpperCase()} (selected: ${role.toUpperCase()}).`);
-      }
-
-      // Save user session details
+      // Save user session details with all expected keys
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('siva_token', data.token);
       localStorage.setItem('siva_user', JSON.stringify(data.user));
 
       // Redirect based on selected role
@@ -108,10 +108,12 @@ export default function Home() {
         router.push('/rm');
       } else if (role === 'md') {
         router.push('/md');
+      } else {
+        throw new Error('Role workspace portal is not registered.');
       }
     } catch (err: any) {
       console.error('Failed to sign in:', err);
-      setNotification(err.message || 'An unexpected authentication error occurred.');
+      setNotification(err.message || 'Network error connecting to authentication server.');
       setTimeout(() => setNotification(null), 4000);
     } finally {
       setLoading(false);
@@ -146,9 +148,9 @@ export default function Home() {
         <div className="w-full md:w-5/12 bg-brand-cherry/30 p-8 sm:p-10 flex flex-col justify-between border-b md:border-b-0 md:border-r border-brand-copper/20 relative">
           
           {/* Logo container */}
-          <div className="flex items-center gap-2">
-            <div className="p-2.5 rounded-xl bg-brand-mahogany border border-brand-copper/35 text-brand-silver flex items-center justify-center">
-              <Coins size={18} className="text-brand-silver animate-pulse" />
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="font-extrabold text-sm tracking-tight text-brand-silver uppercase">Shiva Gold</span>
