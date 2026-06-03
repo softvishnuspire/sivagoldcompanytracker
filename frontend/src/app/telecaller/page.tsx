@@ -367,21 +367,21 @@ export default function TelecallerDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-brand-cherry text-brand-silver flex flex-col font-sans">
+    <div className="min-h-screen bg-[#f4f5f8] text-slate-800 flex flex-col font-sans selection:bg-[#c3902c] selection:text-black">
       {/* Mobile Header */}
-      <header className="lg:hidden flex items-center justify-between p-4 bg-brand-mahogany border-b border-brand-copper/35 sticky top-0 z-40">
+      <header className="lg:hidden flex items-center justify-between p-4 bg-gradient-to-r from-[#4d0711] to-[#200206] border-b border-[#691823]/20 sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 rounded-lg hover:bg-brand-cherry text-brand-slate hover:text-brand-silver transition-colors"
+            className="p-1.5 rounded-lg hover:bg-[#4d0b13]/20 text-amber-100/60 hover:text-amber-300 transition-colors"
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <div className="font-extrabold text-sm tracking-tight text-brand-silver flex items-center gap-2">
+          <div className="font-extrabold text-sm tracking-tight text-amber-300 flex items-center gap-2">
             <div className="w-8 h-8 flex items-center justify-center overflow-hidden">
               <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-full object-contain" />
             </div>
-            <span className="text-brand-silver font-black">SIVA GOLD</span>
+            <span className="text-amber-400 font-black">SIVA GOLD</span>
           </div>
         </div>
 
@@ -395,28 +395,28 @@ export default function TelecallerDashboard() {
       <div className="flex flex-1 relative">
         {/* Sidebar for PC / Navigation Drawer for Mobile */}
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-64 bg-brand-mahogany border-r border-brand-copper/30 flex flex-col justify-between transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static hide-scrollbar ${
+          className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-[#4d0711] to-[#200206] border-r border-[#691823]/20 flex flex-col justify-between transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static hide-scrollbar ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
           <div>
             {/* Sidebar Logo */}
-            <div className="py-2 px-4 border-b border-brand-copper/20 hidden lg:flex flex-col items-center justify-center w-full">
+            <div className="py-2 px-4 border-b border-[#691823]/20 hidden lg:flex flex-col items-center justify-center w-full bg-[#4d0b13]/10">
               <div className="w-full h-32 flex items-center justify-center overflow-hidden">
                 <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-auto" />
               </div>
             </div>
 
             {/* Agent Profile */}
-            <div className="p-5 border-b border-brand-copper/25 bg-brand-cherry/40 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-copper/20 border border-brand-copper/30 text-brand-silver flex items-center justify-center font-bold">
+            <div className="p-5 border-b border-[#691823]/20 bg-[#4d0b13]/10 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold">
                 TC
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-bold text-brand-silver truncate">{currentUser?.name || 'Telecaller Agent 01'}</h4>
+                <h4 className="text-xs font-bold text-amber-100 truncate">{currentUser?.name || 'Telecaller Agent 01'}</h4>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[9px] text-brand-slate font-bold uppercase tracking-wider">
+                  <span className="text-[9px] text-amber-250/70 font-bold uppercase tracking-wider">
                     {dbConnected ? 'Live Connection' : 'Fallback offline'}
                   </span>
                 </div>
@@ -438,13 +438,13 @@ export default function TelecallerDashboard() {
                         setEditingLead(null);
                       }
                     }}
-                    className={`w-full flex items-center gap-3 py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 cursor-pointer ${
+                    className={`w-full flex items-center gap-3 py-3 px-4 rounded-xl text-xs font-semibold tracking-wide transition-all group cursor-pointer ${
                       isActive
-                        ? 'bg-brand-copper text-brand-silver shadow-[0_4px_12px_rgba(101,72,59,0.3)] border border-brand-copper/50'
-                        : 'text-brand-slate hover:bg-brand-cherry/60 hover:text-brand-silver'
+                        ? 'bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold'
+                        : 'text-amber-100/60 hover:bg-[#c3902c]/10 hover:text-amber-300'
                     }`}
                   >
-                    <Icon size={16} />
+                    <Icon size={16} className={`transition-colors ${isActive ? 'text-amber-400' : 'text-amber-100/40 group-hover:text-amber-300'}`} />
                     {item.label}
                   </button>
                 );
@@ -453,13 +453,13 @@ export default function TelecallerDashboard() {
           </div>
 
           {/* Sidebar Footer */}
-          <div className="p-4 border-t border-brand-copper/20">
+          <div className="p-4 border-t border-[#691823]/10">
             <button
               onClick={() => {
                 localStorage.removeItem('siva_user');
                 router.push('/');
               }}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold text-brand-slate hover:bg-rose-500/10 hover:text-rose-400 border border-brand-copper/20 hover:border-rose-500/20 transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-amber-250/70 hover:bg-[#c3902c]/10 hover:text-amber-300 border border-[#691823]/30 hover:border-[#691823]/50 transition-all cursor-pointer"
             >
               <LogOut size={15} />
               Logout Portal
@@ -471,19 +471,19 @@ export default function TelecallerDashboard() {
         {sidebarOpen && (
           <div
             onClick={() => setSidebarOpen(false)}
-            className="fixed inset-0 z-40 bg-brand-cherry/80 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-40 bg-[#200206]/80 backdrop-blur-sm lg:hidden"
           />
         )}
 
         {/* Main Content Workspace */}
         <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6 pb-24 lg:pb-8">
           {/* Header Title bar */}
-          <div className="hidden lg:flex items-center justify-between pb-4 border-b border-brand-mahogany">
+          <div className="hidden lg:flex items-center justify-between pb-4 border-b border-slate-200">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-brand-silver capitalize">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-800 capitalize">
                 {activeTab === 'dashboard' ? `Welcome Back, ${currentUser?.name?.split(' ')[0] || 'Agent'}` : activeTab.replace('-', ' ')}
               </h1>
-              <p className="text-xs text-brand-slate mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 Monitor incoming customer gold pledge requests and initiate outbound callbacks.
               </p>
             </div>
@@ -492,26 +492,26 @@ export default function TelecallerDashboard() {
             <div className="flex items-center gap-3 relative">
               <button 
                 onClick={() => setShowNotification(!showNotification)}
-                className="p-2 rounded-xl bg-brand-mahogany border border-brand-copper/30 hover:border-brand-copper text-brand-slate hover:text-brand-silver transition-all relative cursor-pointer"
+                className="p-2 rounded-xl bg-white border border-slate-200 hover:border-slate-350 text-slate-400 hover:text-slate-600 shadow-sm transition-all relative cursor-pointer"
               >
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand-copper" />
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-500" />
                 <Bell size={16} />
               </button>
 
               {showNotification && (
-                <div className="absolute right-0 top-12 w-72 bg-brand-mahogany border border-brand-copper/30 rounded-2xl p-4 shadow-2xl z-50 animate-scaleUp">
-                  <h4 className="text-xs font-bold text-brand-silver border-b border-brand-copper/20 pb-2 mb-2 uppercase tracking-wide">Notifications</h4>
+                <div className="absolute right-0 top-12 w-72 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xl z-50 animate-scaleUp text-slate-800">
+                  <h4 className="text-xs font-extrabold text-slate-900 border-b border-slate-100 pb-2 mb-2 uppercase tracking-wide">Notifications</h4>
                   <div className="space-y-3">
-                    <div className="text-[11px] text-brand-slate hover:text-brand-silver transition-colors">
-                      <span className="font-bold text-brand-copper">Database Info:</span> {dbConnected ? 'Supabase connected successfully.' : 'Running in fallback offline storage.'}
+                    <div className="text-[11px] text-slate-600 hover:text-slate-900 transition-colors">
+                      <span className="font-bold text-[#c3902c]">Database Info:</span> {dbConnected ? 'Supabase connected successfully.' : 'Running in fallback offline storage.'}
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-brand-mahogany border border-brand-copper/30">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-sm">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-bold text-emerald-400 tracking-wide uppercase">Agent Active</span>
+                <span className="text-[10px] font-bold text-emerald-600 tracking-wide uppercase">Agent Active</span>
               </div>
             </div>
           </div>
@@ -525,35 +525,35 @@ export default function TelecallerDashboard() {
                 {/* Dashboard Summary cards */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Performance Summary */}
-                  <div className="lg:col-span-2 bg-brand-mahogany/40 border border-brand-copper/25 rounded-2xl p-6 backdrop-blur-md flex flex-col justify-between gap-6">
+                  <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col justify-between gap-6">
                     <div>
-                      <h3 className="text-base font-bold text-brand-silver mb-1">Outbound Calling Queue</h3>
-                      <p className="text-xs text-brand-slate">Ready numbers selected according to scheduled callback parameters.</p>
+                      <h3 className="text-base font-bold text-slate-800 mb-1">Outbound Calling Queue</h3>
+                      <p className="text-xs text-slate-500">Ready numbers selected according to scheduled callback parameters.</p>
                     </div>
 
                     <div className="space-y-3.5">
                       {leads.filter(l => ['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(l.status)).slice(0, 3).map((lead, index) => (
-                        <div key={index} className="flex items-center justify-between p-3.5 rounded-xl bg-brand-cherry/40 border border-brand-copper/15">
+                        <div key={index} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-brand-copper/20 border border-brand-copper/30 text-brand-silver flex items-center justify-center font-bold text-xs">
+                            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 flex items-center justify-center font-bold text-xs">
                               {lead.customerName.charAt(0)}
                             </div>
                             <div>
-                              <h4 className="text-xs font-bold text-brand-silver">{lead.customerName}</h4>
-                              <p className="text-[10px] text-brand-slate mt-0.5">{lead.mobile} | {lead.district}</p>
+                              <h4 className="text-xs font-bold text-slate-800">{lead.customerName}</h4>
+                              <p className="text-[10px] text-slate-500 mt-0.5">{lead.mobile} | {lead.district}</p>
                             </div>
                           </div>
 
                           <button
                             onClick={() => triggerCallSimulationFromFollowup(lead)}
-                            className="flex items-center gap-1 py-1.5 px-3 rounded-lg bg-brand-copper hover:bg-brand-copper/80 text-brand-silver text-[10px] font-bold transition-all cursor-pointer shadow-md"
+                            className="flex items-center gap-1 py-1.5 px-3 rounded-lg bg-[#c3902c] hover:bg-amber-600 text-white text-[10px] font-bold transition-all cursor-pointer shadow-sm"
                           >
                             <Phone size={11} /> Dial Client
                           </button>
                         </div>
                       ))}
                       {leads.filter(l => ['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(l.status)).length === 0 && (
-                        <div className="py-8 text-center text-xs text-brand-slate/60 uppercase tracking-widest">
+                        <div className="py-8 text-center text-xs text-slate-400 uppercase tracking-widest font-medium">
                           Queue is currently empty.
                         </div>
                       )}
@@ -561,38 +561,38 @@ export default function TelecallerDashboard() {
 
                     <button
                       onClick={() => setActiveTab('leads-list')}
-                      className="w-full text-center py-2 text-xs font-bold text-brand-slate hover:text-brand-silver transition-colors border border-dashed border-brand-copper/35 hover:border-brand-copper/60 rounded-xl"
+                      className="w-full text-center py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors border border-dashed border-slate-200 hover:border-slate-400 rounded-xl bg-white"
                     >
                       View All Active Leads List
                     </button>
                   </div>
 
                   {/* Daily Gold Rate Banner */}
-                  <div className="bg-gradient-to-br from-brand-mahogany/70 via-brand-cherry/30 to-brand-mahogany border border-brand-copper/30 rounded-2xl p-6 flex flex-col justify-between gap-6 shadow-[0_8px_32px_rgba(61,21,16,0.2)]">
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-6 flex flex-col justify-between gap-6 shadow-sm">
                     <div>
-                      <span className="text-[9px] bg-brand-copper/20 text-brand-silver border border-brand-copper/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                      <span className="text-[9px] bg-amber-500/10 text-amber-800 border border-amber-500/30 px-2 py-0.5 rounded-full font-extrabold uppercase tracking-wider">
                         Market Info
                       </span>
-                      <h3 className="text-lg font-extrabold text-brand-silver mt-3">Live Gold Rate Today</h3>
-                      <p className="text-xs text-brand-slate mt-1">Simulated spot exchange price for standard 22K/24K purity benchmarks.</p>
+                      <h3 className="text-lg font-extrabold text-slate-800 mt-3">Live Gold Rate Today</h3>
+                      <p className="text-xs text-slate-500 mt-1">Simulated spot exchange price for standard 22K/24K purity benchmarks.</p>
                     </div>
 
                     <div className="space-y-3">
-                      <div className="flex justify-between items-center py-2 border-b border-brand-copper/10">
-                        <span className="text-xs text-brand-slate font-medium">Standard Gold (24K/1g)</span>
-                        <span className="text-sm font-bold text-brand-silver">₹7,450.00</span>
+                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                        <span className="text-xs text-slate-600 font-medium">Standard Gold (24K/1g)</span>
+                        <span className="text-sm font-bold text-slate-800">₹7,450.00</span>
                       </div>
-                      <div className="flex justify-between items-center py-2 border-b border-brand-copper/10">
-                        <span className="text-xs text-brand-slate font-medium">Standard Gold (22K/1g)</span>
-                        <span className="text-sm font-bold text-brand-silver">₹6,830.00</span>
+                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                        <span className="text-xs text-slate-600 font-medium">Standard Gold (22K/1g)</span>
+                        <span className="text-sm font-bold text-slate-800">₹6,830.00</span>
                       </div>
                       <div className="flex justify-between items-center py-2">
-                        <span className="text-xs text-brand-slate font-medium">Silver Spot (1kg)</span>
-                        <span className="text-sm font-bold text-brand-silver/90">₹92,500.00</span>
+                        <span className="text-xs text-slate-600 font-medium">Silver Spot (1kg)</span>
+                        <span className="text-sm font-bold text-slate-800">₹92,500.00</span>
                       </div>
                     </div>
 
-                    <div className="text-[10px] text-brand-slate/60 italic text-center">
+                    <div className="text-[10px] text-slate-400 italic text-center">
                       Rates updated 10 mins ago. Source spot index.
                     </div>
                   </div>
@@ -655,7 +655,7 @@ export default function TelecallerDashboard() {
       </div>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-brand-mahogany border-t border-brand-copper/25 p-2 flex items-center justify-around z-40 backdrop-blur-md bg-opacity-95 shadow-2xl">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-gradient-to-r from-[#4d0711] to-[#200206] border-t border-[#691823]/25 p-2 flex items-center justify-around z-40 backdrop-blur-md bg-opacity-95 shadow-2xl">
         {navigationItems.map(item => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -669,7 +669,7 @@ export default function TelecallerDashboard() {
                 }
               }}
               className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all duration-300 ${
-                isActive ? 'text-brand-silver' : 'text-brand-slate hover:text-brand-silver'
+                isActive ? 'text-amber-400' : 'text-amber-100/60 hover:text-amber-300'
               }`}
             >
               <Icon size={18} />

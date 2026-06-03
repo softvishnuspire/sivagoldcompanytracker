@@ -5,6 +5,37 @@ This repository is configured with two main independent workspaces implementing 
 1. `frontend/` - Next.js (App Router) project with TypeScript, Tailwind CSS v4, and dynamic transition animations.
 2. `backend/` - Node.js project running an Express server with Supabase PostgreSQL connection, JWT Authentication, and RBAC middleware.
 
+## Custom Theme Palette
+We have configured a brand-specific luxury color palette from Coolors:
+- **Primary Background**: `#300F0F` (Deep Cherry Black)
+- **Container/Card Background**: `#3D1510` (Dark Mahogany Red)
+- **Borders & Hover Accent Highlights**: `#65483B` (Warm Copper Bronze)
+- **Secondary Text Descriptions**: `#88868A` (Muted Slate Gray)
+- **Primary Typography & Indicators**: `#D9D9DA` (Bright Silver Off-White)
+
+Registered custom utility properties in globals.css:
+- `--color-brand-mahogany`
+- `--color-brand-cherry`
+- `--color-brand-copper`
+- `--color-brand-slate`
+- `--color-brand-silver`
+
+Registered custom utility properties for the Login Page (brushed gold brass & light warm brown contrast):
+- `--color-login-bg` (`#E6D2B8` - Light Warm Cocoa/Camel Brown)
+- `--color-login-bg-glow` (`#C59E3F` - Brushed Gold Brass Glow)
+- `--color-login-card` (`#FFFFFF` - Crisp White Card)
+- `--color-login-card-left` (`#FAF5EF` - Soft Warm Ivory Left Pane)
+- `--color-login-border` (`#C8B89E` - Soft Gold/Brass Border)
+- `--color-login-text-dark` (`#382009` - Deep Cocoa Brown)
+- `--color-login-text-muted` (`#7D6852` - Warm Taupe/Muted Brown)
+- `--color-login-primary` (`#C59E3F` - Brushed Gold Brass)
+- `--color-login-primary-hover` (`#A6802B` - Antique Brass)
+
+## Environment Configuration
+We have added the environment variables file for Port and Supabase connection parameters:
+- `backend/.env` — Backend node process environment variables.
+- `frontend/.env.local` — Next.js client and server environment configurations.
+
 ## Version Control
 - A root-level `.gitignore` excludes build outputs, Node modules, and credentials environment files.
 - Remote repository link: `https://github.com/softvishnuspire/sivagoldcompanytracker.git`.
@@ -121,7 +152,11 @@ graph TD
 - **CORS loopback and configurable API endpoints**: Updated the backend CORS policy in `backend/index.js` to allow both `localhost` and loopback `127.0.0.1` origins, preventing `TypeError: Failed to fetch` errors in browsers that resolve localhost using IPv4 loopback. Cleaned up frontend login `frontend/src/app/page.tsx` and RM dashboard `frontend/src/app/rm/page.tsx` fetches to dynamically resolve `process.env.NEXT_PUBLIC_API_URL` instead of hardcoded `localhost:5000` URLs.
 - **JWT Key Fallback Alignment**: Aligned the default fallback `JWT_SECRET` key in `backend/index.js` with the one in `backend/middleware/auth.js` (`'shivagold_super_secret_jwt_key_2026'`) and added it to the `backend/.env` file. This resolves the token validation errors on the Executive Dashboard caused by mismatching signing and verification keys when running locally.
 - **Auto-Logout on Session Expired/Invalid**: Configured the frontend API request handler in `frontend/src/lib/api.ts` to automatically evict the invalid/expired session tokens from local storage and redirect the user back to the portal sign-in page if a 401 or 403 authorization error is returned by the server. This prevents users from getting locked in an infinite refresh loop on dashboard metrics error states.
-
+- **Login Theme Redesign**: Redesigned the login page layout to feature a premium Burgundy gradient background (`from-[#4d0711] to-[#200206]`) with brushed gold ambient glows, and a crisp white login card container to match the Relationship Manager (RM) dashboard. Removed brand text and enlarged the logo container to a wide rectangular card to elegantly fill the workspace space.
+- **Theme Alignment for Telecaller and Executive Dashboards**: Redesigned the visual theme of the Telecaller portal (including all subcomponents: `StatsOverview`, `LeadForm`, `LeadList`, `FollowupList`, `PendingFollowupsList`, `ReportsView`, and `DocumentsView`) and the Executive portal dashboard to align with the Relationship Manager (RM) dashboard's visual style. Replaced dark layouts with Burgundy gradient sidebars (`from-[#4d0711] to-[#200206]`), light gray workspaces (`#f4f5f8`), white card containers (`bg-white` with `border-slate-200/80` borders), gold/amber highlights (`#c3902c`), and slate text. Added interactive case flow status actions on the Field Executive dashboard.
+- **Syntax and Scope Fixes on Dashboards**: Resolved a compilation error in `LeadList.tsx` caused by a missing parent container closing `</div>` tag, and resolved an undefined reference error in `executive/page.tsx` where `setSearchTerm` was incorrectly called instead of `setSearchQuery`.
+- **Login Logo Card Styling Adjustments**: Widened the left brand pane to `md:w-[46%]` (reducing right pane to `md:w-[54%]`) and decreased its padding to `p-6 sm:p-8` to maximize horizontal space for the logo. Adjusted the logo card's height to `h-36 sm:h-44` and set scale to `scale-[1.7]` to eliminate empty margins while preventing any horizontal clipping of the logo's gold flourishes. Set the background to dark brand mahogany (`#3d1510`) with a gold border (`#c3902c/30`).
+- **Enhanced Ambient Background Gold Glows**: Layered additional gold glows on the login page background, including a central halo behind the login card, side glows, and higher opacity coefficients, creating a richer depth contrast with the burgundy gradient.
 
 
 

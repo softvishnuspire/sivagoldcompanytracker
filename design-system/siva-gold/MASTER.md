@@ -7,8 +7,8 @@
 ---
 
 **Project:** Siva Gold
-**Generated:** 2026-06-03 11:33:50
-**Category:** Banking/Traditional Finance
+**Generated:** 2026-06-03 15:08:29
+**Category:** Job Board/Recruitment
 
 ---
 
@@ -18,24 +18,24 @@
 
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary | `#DB2777` | `--color-primary` |
-| Secondary | `#F472B6` | `--color-secondary` |
-| CTA/Accent | `#CA8A04` | `--color-cta` |
-| Background | `#FDF2F8` | `--color-background` |
-| Text | `#831843` | `--color-text` |
+| Primary | `#92400E` | `--color-primary` |
+| Secondary | `#B45309` | `--color-secondary` |
+| CTA/Accent | `#F8FAFC` | `--color-cta` |
+| Background | `#FEF3C7` | `--color-background` |
+| Text | `#78350F` | `--color-text` |
 
-**Color Notes:** Romantic pink + elegant gold
+**Color Notes:** Warm brown + cream white
 
 ### Typography
 
-- **Heading Font:** Fira Code
-- **Body Font:** Fira Sans
-- **Mood:** dashboard, data, analytics, code, technical, precise
-- **Google Fonts:** [Fira Code + Fira Sans](https://fonts.google.com/share?selection.family=Fira+Code:wght@400;500;600;700|Fira+Sans:wght@300;400;500;600;700)
+- **Heading Font:** Fredoka
+- **Body Font:** Nunito
+- **Mood:** playful, friendly, fun, creative, warm, approachable
+- **Google Fonts:** [Fredoka + Nunito](https://fonts.google.com/share?selection.family=Fredoka:wght@400;500;600;700|Nunito:wght@300;400;500;600;700)
 
 **CSS Import:**
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap');
 ```
 
 ### Spacing Variables
@@ -68,7 +68,7 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #CA8A04;
+  background: #F8FAFC;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -85,8 +85,8 @@
 /* Secondary Button */
 .btn-secondary {
   background: transparent;
-  color: #DB2777;
-  border: 2px solid #DB2777;
+  color: #92400E;
+  border: 2px solid #92400E;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -99,7 +99,7 @@
 
 ```css
 .card {
-  background: #FDF2F8;
+  background: #FEF3C7;
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
@@ -125,9 +125,9 @@
 }
 
 .input:focus {
-  border-color: #DB2777;
+  border-color: #92400E;
   outline: none;
-  box-shadow: 0 0 0 3px #DB277720;
+  box-shadow: 0 0 0 3px #92400E20;
 }
 ```
 
@@ -163,7 +163,7 @@
 
 ### Page Pattern
 
-**Pattern Name:** Trust & Authority + Feature
+**Pattern Name:** Conversion-Optimized + Feature-Rich
 
 - **CTA Placement:** Above fold
 - **Section Order:** Hero > Features > CTA
@@ -172,9 +172,8 @@
 
 ## Anti-Patterns (Do NOT Use)
 
-- ❌ Playful design
-- ❌ Poor security UX
-- ❌ AI purple/pink gradients
+- ❌ Outdated forms
+- ❌ Hidden filters
 
 ### Additional Forbidden Patterns
 

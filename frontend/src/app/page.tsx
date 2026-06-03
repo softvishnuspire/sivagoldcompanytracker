@@ -19,7 +19,6 @@ import {
   Info
 } from 'lucide-react';
 
-
 type UserRole = 'telecaller' | 'rm' | 'executive' | 'md';
 
 export default function Home() {
@@ -124,69 +123,70 @@ export default function Home() {
   const ActiveRoleIcon = roleDetails[role].icon;
 
   return (
-    <div className="min-h-screen bg-brand-cherry text-brand-silver flex items-center justify-center p-4 sm:p-8 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-[#4d0711] to-[#200206] text-slate-800 flex items-center justify-center p-4 sm:p-8 font-sans relative overflow-hidden">
       
-      {/* Background ambient gold gradient glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] rounded-full bg-brand-mahogany/15 blur-[130px] pointer-events-none z-0" />
+      {/* Background ambient gold gradient glows */}
+      <div className="absolute -top-40 -left-40 w-[650px] h-[650px] rounded-full bg-[#c3902c]/22 blur-[130px] pointer-events-none z-0" />
+      <div className="absolute -bottom-40 -right-40 w-[650px] h-[650px] rounded-full bg-[#c3902c]/18 blur-[130px] pointer-events-none z-0" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] rounded-full bg-[#c3902c]/12 blur-[140px] pointer-events-none z-0" />
+      <div className="absolute top-1/4 right-0 w-[450px] h-[450px] rounded-full bg-[#c3902c]/15 blur-[110px] pointer-events-none z-0" />
+      <div className="absolute bottom-1/4 left-0 w-[450px] h-[450px] rounded-full bg-[#c3902c]/10 blur-[110px] pointer-events-none z-0" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-white/5 blur-[150px] pointer-events-none z-0" />
 
       {/* Floating notification toast */}
       {notification && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full bg-brand-mahogany border border-brand-copper/50 rounded-2xl p-4 shadow-2xl animate-scaleUp flex items-start gap-3">
-          <div className="p-2 rounded-xl bg-brand-copper/10 text-brand-silver border border-brand-copper/20">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xl animate-scaleUp flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20">
             <Info size={16} />
           </div>
           <div className="flex-1 min-w-0">
-            <h5 className="text-xs font-bold text-white">Security Alert</h5>
-            <p className="text-[11px] text-brand-slate mt-0.5 leading-normal">{notification}</p>
+            <h5 className="text-xs font-bold text-slate-900">Security Alert</h5>
+            <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">{notification}</p>
           </div>
         </div>
       )}
 
       {/* Main card wrapper */}
-      <div className="max-w-4xl w-full min-h-[520px] bg-brand-mahogany/45 border border-brand-copper/25 backdrop-blur-md rounded-3xl overflow-hidden shadow-[0_12px_40px_rgba(61,21,16,0.35)] flex flex-col md:flex-row z-10 animate-scaleUp">
+      <div className="max-w-4xl w-full min-h-[540px] bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-[0_24px_60px_rgba(32,2,6,0.3)] flex flex-col md:flex-row z-10 animate-scaleUp">
         
         {/* Left Pane: Brand identity banner */}
-        <div className="w-full md:w-5/12 bg-brand-cherry/30 p-8 sm:p-10 flex flex-col justify-between border-b md:border-b-0 md:border-r border-brand-copper/20 relative">
+        <div className="w-full md:w-[46%] bg-slate-50/60 p-6 sm:p-8 flex flex-col justify-between gap-10 border-b md:border-b-0 md:border-r border-slate-200/80 relative">
           
           {/* Logo container */}
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
-              <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-full object-contain" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-extrabold text-sm tracking-tight text-brand-silver uppercase">Shiva Gold</span>
-              <span className="text-[9px] text-brand-slate font-bold uppercase tracking-widest mt-0.5">Management Portal</span>
+          <div className="w-full">
+            <div className="w-full h-36 sm:h-44 flex items-center justify-center overflow-hidden bg-[#3d1510] rounded-2xl p-0 border border-[#c3902c]/30 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.01]">
+              <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-full object-contain scale-[1.7]" />
             </div>
           </div>
 
           {/* Core messages */}
           <div className="space-y-4 my-10 md:my-0">
-            <h1 className="text-3xl font-black text-brand-silver tracking-tight leading-tight">
+            <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-tight">
               Welcome<br />Back
             </h1>
-            <p className="text-xs text-brand-slate leading-relaxed">
-              Access your personalized dashboard by selecting your designated role below. Gold tracking and contact logs are synchronized in real-time.
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Access your authorized workspace portal by selecting your designated role and entering credentials. Real-time updates and synchronization are active.
             </p>
           </div>
 
           {/* Secured watermark footer */}
-          <div className="flex items-center gap-2 text-[9px] text-brand-slate uppercase font-bold tracking-wider">
-            <ShieldCheck size={13} className="text-brand-copper/60" /> Secured internal workspace
+          <div className="flex items-center gap-2 text-[9px] text-slate-400 uppercase font-bold tracking-wider">
+            <ShieldCheck size={13} className="text-[#c3902c]" /> Secured internal workspace
           </div>
         </div>
 
         {/* Right Pane: Login Form inputs */}
-        <div className="w-full md:w-7/12 p-8 sm:p-10 flex flex-col justify-center gap-6">
+        <div className="w-full md:w-[54%] p-6 sm:p-8 md:p-10 flex flex-col justify-center gap-6 bg-white">
           <div className="space-y-1.5">
-            <h2 className="text-xl font-bold text-brand-silver">Select your role</h2>
-            <p className="text-xs text-brand-slate">Choose your workspace to continue</p>
+            <h2 className="text-xl font-bold text-slate-800">Select your role</h2>
+            <p className="text-xs text-slate-450">Choose your workspace to continue</p>
           </div>
 
           <form onSubmit={handleSignIn} className="space-y-5">
             
             {/* Custom role select popover container */}
             <div className="space-y-2" ref={dropdownRef}>
-              <label className="block text-[10px] font-bold text-brand-slate uppercase tracking-wider">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Workspace Role
               </label>
               
@@ -196,18 +196,18 @@ export default function Home() {
                   type="button"
                   disabled={loading}
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="w-full bg-brand-cherry/40 border border-brand-copper/20 rounded-xl py-3 pl-12 pr-10 text-xs text-brand-silver outline-none focus:border-brand-copper focus:ring-1 focus:ring-brand-copper/20 flex items-center justify-between font-bold cursor-pointer text-left"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-12 pr-10 text-xs text-slate-700 outline-none focus:border-[#c3902c] focus:ring-1 focus:ring-amber-500/10 flex items-center justify-between font-bold cursor-pointer text-left"
                 >
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-silver p-1 rounded-lg bg-brand-cherry/60 border border-brand-copper/15">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#c3902c] p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
                     <ActiveRoleIcon size={14} />
                   </span>
                   <span>{roleDetails[role].label}</span>
-                  <ChevronDown size={15} className={`text-brand-slate transition-transform duration-300 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={15} className={`text-slate-400 transition-transform duration-300 ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {/* Dropdown Options overlay */}
                 {dropdownOpen && (
-                  <div className="absolute left-0 right-0 mt-1.5 bg-brand-mahogany border border-brand-copper/35 rounded-xl shadow-2xl overflow-hidden z-20 animate-scaleUp divide-y divide-brand-copper/10">
+                  <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden z-20 animate-scaleUp divide-y divide-slate-100">
                     {(Object.keys(roleDetails) as UserRole[]).map((roleKey) => {
                       const item = roleDetails[roleKey];
                       const ItemIcon = item.icon;
@@ -223,20 +223,20 @@ export default function Home() {
                           }}
                           className={`w-full flex items-center gap-3 p-3 text-left transition-colors duration-200 cursor-pointer ${
                             isSelected 
-                              ? 'bg-brand-copper/20 text-brand-silver border-l-2 border-brand-copper' 
-                              : 'text-brand-slate hover:bg-brand-copper/10 hover:text-brand-silver'
+                              ? 'bg-amber-500/10 text-amber-700 border-l-2 border-amber-500' 
+                              : 'text-slate-550 hover:bg-slate-50 hover:text-slate-800'
                           }`}
                         >
-                          <div className="p-2 rounded-lg bg-brand-cherry/60 border border-brand-copper/10">
+                          <div className="p-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
                             <ItemIcon size={14} />
                           </div>
                           
                           <div className="flex-1 min-w-0">
                             <div className="text-xs font-bold flex items-center justify-between">
                               {item.title}
-                              {isSelected && <Check size={12} className="text-brand-silver" />}
+                              {isSelected && <Check size={12} className="text-amber-500" />}
                             </div>
-                            <div className="text-[10px] text-brand-slate/80 truncate mt-0.5">{item.desc}</div>
+                            <div className="text-[10px] text-slate-400 truncate mt-0.5">{item.desc}</div>
                           </div>
                         </button>
                       );
@@ -248,11 +248,11 @@ export default function Home() {
 
             {/* Email field */}
             <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-brand-slate uppercase tracking-wider">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Email Address
               </label>
               <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-slate">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                   <Mail size={14} />
                 </div>
                 <input
@@ -260,7 +260,7 @@ export default function Home() {
                   value={email}
                   disabled={loading}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-brand-cherry/40 border border-brand-copper/20 rounded-xl py-3 pl-10 pr-4 text-xs text-brand-silver outline-none focus:border-brand-copper focus:ring-1 focus:ring-brand-copper/20 placeholder-brand-slate/30"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-xs text-slate-700 outline-none focus:border-[#c3902c] focus:ring-1 focus:ring-amber-500/10 placeholder-slate-400"
                   placeholder="name@sivagold.com"
                   required
                 />
@@ -270,19 +270,19 @@ export default function Home() {
             {/* Password field */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="block text-[10px] font-bold text-brand-slate uppercase tracking-wider">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Password
                 </label>
                 <button
                   type="button"
                   onClick={() => alert('Password reset simulation.')}
-                  className="text-[9px] font-bold text-brand-copper hover:text-brand-silver transition-colors"
+                  className="text-[9px] font-bold text-amber-600 hover:text-amber-700 transition-colors"
                 >
                   Forgot password?
                 </button>
               </div>
               <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-slate">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                   <Lock size={14} />
                 </div>
                 <input
@@ -290,14 +290,14 @@ export default function Home() {
                   value={password}
                   disabled={loading}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-brand-cherry/40 border border-brand-copper/20 rounded-xl py-3 pl-10 pr-10 text-xs text-brand-silver outline-none focus:border-brand-copper focus:ring-1 focus:ring-brand-copper/20 placeholder-brand-slate/30"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-10 text-xs text-slate-700 outline-none focus:border-[#c3902c] focus:ring-1 focus:ring-amber-500/10 placeholder-slate-400"
                   placeholder="••••••••"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-brand-slate hover:text-brand-silver transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -308,9 +308,9 @@ export default function Home() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 py-3.5 px-4 bg-brand-copper hover:bg-brand-copper/90 text-brand-silver text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:shadow-[0_0_24px_rgba(101,72,59,0.35)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-2 py-3.5 px-4 bg-[#c3902c] hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:shadow-[0_4px_16px_rgba(195,144,44,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Authenticating...' : `Sign In as ${roleDetails[role].title}`} <ArrowRight size={14} />
+              {loading ? 'Authenticating...' : `Sign In as ${roleDetails[role].title}`} <ArrowRight size={14} className="text-white" />
             </button>
 
           </form>

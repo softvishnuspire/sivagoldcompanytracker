@@ -16,6 +16,17 @@
   --color-brand-copper: #65483b;
   --color-brand-slate: #88868a;
   --color-brand-silver: #d9d9da;
+
+  /* Login page specific warm white & brown theme */
+  --color-login-bg: #E6D2B8;
+  --color-login-bg-glow: #C59E3F;
+  --color-login-card: #FFFFFF;
+  --color-login-card-left: #FAF5EF;
+  --color-login-border: #C8B89E;
+  --color-login-text-dark: #382009;
+  --color-login-text-muted: #7D6852;
+  --color-login-primary: #C59E3F;
+  --color-login-primary-hover: #A6802B;
 }
 
 

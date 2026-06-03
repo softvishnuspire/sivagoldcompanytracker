@@ -78,44 +78,44 @@ export default function ReportsView({ leads }: ReportsViewProps) {
     <div className="space-y-6">
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-brand-mahogany/40 border border-brand-copper/30 rounded-2xl p-5 backdrop-blur-md flex items-center gap-4">
-          <div className="p-3 bg-brand-copper/20 text-brand-silver rounded-xl border border-brand-copper/35">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-amber-500/10 text-amber-700 rounded-xl border border-amber-500/25">
             <TrendingUp size={22} />
           </div>
           <div>
-            <div className="text-xs text-brand-slate font-semibold uppercase tracking-wider">Total Output</div>
-            <div className="text-2xl font-bold text-brand-silver mt-0.5">{leads.length} Leads</div>
-            <div className="text-[10px] text-emerald-400 mt-1 font-medium">All database files synchronized</div>
+            <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Output</div>
+            <div className="text-2xl font-extrabold text-slate-850 mt-0.5">{leads.length} Leads</div>
+            <div className="text-[10px] text-emerald-600 mt-1 font-bold">All database files synchronized</div>
           </div>
         </div>
 
-        <div className="bg-brand-mahogany/40 border border-brand-copper/30 rounded-2xl p-5 backdrop-blur-md flex items-center gap-4">
-          <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-500/10 text-emerald-700 rounded-xl border border-emerald-500/25">
             <Award size={22} />
           </div>
           <div>
-            <div className="text-xs text-brand-slate font-semibold uppercase tracking-wider">Conversion Ratio</div>
-            <div className="text-2xl font-bold text-brand-silver mt-0.5">
+            <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Conversion Ratio</div>
+            <div className="text-2xl font-extrabold text-slate-850 mt-0.5">
               {leads.length > 0 
                 ? Math.round((leads.filter(l => ['DETAILS_COLLECTED', 'SENT_TO_RM', 'RM_APPROVED', 'CASE_COMPLETED'].includes(l.status)).length / leads.length) * 100) 
                 : 0}%
             </div>
-            <div className="text-[10px] text-brand-slate mt-1 font-medium">Qualified Leads / Total Leads</div>
+            <div className="text-[10px] text-slate-400 mt-1 font-bold">Qualified Leads / Total Leads</div>
           </div>
         </div>
 
-        <div className="bg-brand-mahogany/40 border border-brand-copper/30 rounded-2xl p-5 backdrop-blur-md flex items-center gap-4">
-          <div className="p-3 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-rose-500/10 text-rose-750 rounded-xl border border-rose-500/25">
             <ShieldAlert size={22} />
           </div>
           <div>
-            <div className="text-xs text-brand-slate font-semibold uppercase tracking-wider">Rejection Ratio</div>
-            <div className="text-2xl font-bold text-brand-silver mt-0.5">
+            <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Rejection Ratio</div>
+            <div className="text-2xl font-extrabold text-slate-850 mt-0.5">
               {leads.length > 0 
                 ? Math.round((leads.filter(l => l.status === 'RM_REJECTED').length / leads.length) * 100) 
                 : 0}%
             </div>
-            <div className="text-[10px] text-brand-slate mt-1 font-medium">Rejected Leads / Total Leads</div>
+            <div className="text-[10px] text-slate-400 mt-1 font-bold">Rejected Leads / Total Leads</div>
           </div>
         </div>
       </div>
@@ -123,27 +123,27 @@ export default function ReportsView({ leads }: ReportsViewProps) {
       {/* Daily & Monthly Chart Visualizer */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Daily Leads Bar Chart */}
-        <div className="bg-brand-mahogany/40 border border-brand-copper/30 rounded-2xl p-5 backdrop-blur-md">
-          <h3 className="text-sm font-bold text-brand-silver uppercase tracking-wider mb-6 flex items-center gap-2">
-            <BarChart3 size={16} className="text-brand-copper" /> Daily Lead Count (Last 7 Days)
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm text-slate-800">
+          <h3 className="text-sm font-bold text-slate-850 uppercase tracking-wider mb-6 flex items-center gap-2">
+            <BarChart3 size={16} className="text-amber-500" /> Daily Lead Count (Last 7 Days)
           </h3>
 
-          <div className="h-64 flex items-end justify-between gap-3 pt-4 border-b border-brand-copper/15 px-2">
+          <div className="h-64 flex items-end justify-between gap-3 pt-4 border-b border-slate-100 px-2 relative">
             {dailyData.map((d, i) => {
               const heightPercent = (d.value / maxDailyValue) * 80;
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+                <div key={i} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer relative">
                   {/* Tooltip */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-brand-cherry border border-brand-copper/30 py-1 px-2.5 rounded-lg text-[10px] font-bold text-brand-silver -mt-8 absolute shadow-lg pointer-events-none">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-800 border border-slate-700 py-1 px-2.5 rounded-lg text-[10px] font-bold text-white -mt-8 absolute shadow-lg pointer-events-none z-10">
                     {d.value} Leads
                   </div>
                   {/* Bar */}
                   <div 
                     style={{ height: `${Math.max(heightPercent, 5)}%` }}
-                    className="w-full bg-gradient-to-t from-brand-copper to-brand-copper/30 border-t border-x border-brand-copper/20 rounded-t-lg group-hover:from-brand-copper group-hover:to-brand-copper/90 transition-all duration-300 shadow-[0_0_12px_rgba(101,72,59,0.1)]"
+                    className="w-full bg-gradient-to-t from-[#c3902c] to-amber-400 border-t border-x border-amber-500/25 rounded-t-lg group-hover:from-amber-600 group-hover:to-amber-550 transition-all duration-300 shadow-sm"
                   />
                   {/* Label */}
-                  <span className="text-[10px] text-brand-slate font-semibold mt-1.5 transform group-hover:text-brand-silver transition-colors">
+                  <span className="text-[10px] text-slate-400 font-bold mt-1.5 transform group-hover:text-slate-800 transition-colors">
                     {d.label}
                   </span>
                 </div>
@@ -153,27 +153,27 @@ export default function ReportsView({ leads }: ReportsViewProps) {
         </div>
 
         {/* Monthly Leads Bar Chart */}
-        <div className="bg-brand-mahogany/40 border border-brand-copper/30 rounded-2xl p-5 backdrop-blur-md">
-          <h3 className="text-sm font-bold text-brand-silver uppercase tracking-wider mb-6 flex items-center gap-2">
-            <BarChart3 size={16} className="text-brand-copper" /> Monthly Lead Count
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm text-slate-800">
+          <h3 className="text-sm font-bold text-slate-850 uppercase tracking-wider mb-6 flex items-center gap-2">
+            <BarChart3 size={16} className="text-amber-500" /> Monthly Lead Count
           </h3>
 
-          <div className="h-64 flex items-end justify-around gap-6 pt-4 border-b border-brand-copper/15 px-4">
+          <div className="h-64 flex items-end justify-around gap-6 pt-4 border-b border-slate-100 px-4 relative">
             {monthlyData.map((d, i) => {
               const heightPercent = (d.value / maxMonthlyValue) * 80;
               return (
-                <div key={i} className="w-16 flex flex-col items-center gap-2 group cursor-pointer">
+                <div key={i} className="w-16 flex flex-col items-center gap-2 group cursor-pointer relative">
                   {/* Tooltip */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-brand-cherry border border-brand-copper/30 py-1 px-2.5 rounded-lg text-[10px] font-bold text-brand-silver -mt-8 absolute shadow-lg pointer-events-none">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-800 border border-slate-700 py-1 px-2.5 rounded-lg text-[10px] font-bold text-white -mt-8 absolute shadow-lg pointer-events-none z-10">
                     {d.value} Leads
                   </div>
                   {/* Bar */}
                   <div 
                     style={{ height: `${Math.max(heightPercent, 5)}%` }}
-                    className="w-full bg-gradient-to-t from-brand-copper/80 to-brand-copper/20 border-t border-x border-brand-copper/20 rounded-t-lg group-hover:from-brand-copper group-hover:to-brand-copper/90 transition-all duration-300 shadow-[0_0_12px_rgba(101,72,59,0.1)]"
+                    className="w-full bg-gradient-to-t from-[#c3902c] to-amber-400 border-t border-x border-amber-500/25 rounded-t-lg group-hover:from-amber-600 group-hover:to-amber-550 transition-all duration-300 shadow-sm"
                   />
                   {/* Label */}
-                  <span className="text-[10px] text-brand-slate font-semibold mt-1.5 transform group-hover:text-brand-silver transition-colors">
+                  <span className="text-[10px] text-slate-400 font-bold mt-1.5 transform group-hover:text-slate-800 transition-colors">
                     {d.label}
                   </span>
                 </div>
@@ -186,9 +186,9 @@ export default function ReportsView({ leads }: ReportsViewProps) {
       {/* District & Status Tables/Progress Bars */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* District Distribution */}
-        <div className="bg-brand-mahogany/40 border border-brand-copper/30 rounded-2xl p-5 backdrop-blur-md">
-          <h3 className="text-sm font-bold text-brand-silver uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Map size={16} className="text-brand-copper" /> District Wise Performance
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm text-slate-800">
+          <h3 className="text-sm font-bold text-slate-855 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Map size={16} className="text-amber-500" /> District Wise Performance
           </h3>
           <div className="space-y-4">
             {districtData.map(([district, count], index) => {
@@ -196,14 +196,14 @@ export default function ReportsView({ leads }: ReportsViewProps) {
               const percentage = (count / maxVal) * 100;
               return (
                 <div key={index} className="space-y-1">
-                  <div className="flex justify-between text-xs font-semibold text-brand-silver">
+                  <div className="flex justify-between text-xs font-bold text-slate-700">
                     <span>{district}</span>
-                    <span className="text-brand-silver">{count} Leads</span>
+                    <span className="text-[#c3902c]">{count} Leads</span>
                   </div>
-                  <div className="w-full h-2 bg-brand-cherry/40 rounded-full overflow-hidden border border-brand-copper/15">
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
                     <div 
                       style={{ width: `${percentage}%` }}
-                      className="h-full bg-brand-copper rounded-full"
+                      className="h-full bg-[#c3902c] rounded-full"
                     />
                   </div>
                 </div>
@@ -213,9 +213,9 @@ export default function ReportsView({ leads }: ReportsViewProps) {
         </div>
 
         {/* Lead Stage / Status Funnel */}
-        <div className="bg-brand-mahogany/40 border border-brand-copper/30 rounded-2xl p-5 backdrop-blur-md">
-          <h3 className="text-sm font-bold text-brand-silver uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Award size={16} className="text-brand-copper" /> Lead Stage Funnel
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm text-slate-800">
+          <h3 className="text-sm font-bold text-slate-855 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Award size={16} className="text-amber-500" /> Lead Stage Funnel
           </h3>
           <div className="space-y-4">
             {statusData.map(([status, count], index) => {
@@ -223,14 +223,14 @@ export default function ReportsView({ leads }: ReportsViewProps) {
               const percentage = (count / maxVal) * 100;
               return (
                 <div key={index} className="space-y-1">
-                  <div className="flex justify-between text-xs font-semibold text-brand-silver">
-                    <span className="uppercase text-[10px] tracking-wide font-mono text-brand-slate">{status}</span>
-                    <span className="text-brand-silver">{count} Leads</span>
+                  <div className="flex justify-between text-xs font-bold text-slate-750">
+                    <span className="uppercase text-[10px] tracking-wide font-mono text-slate-450">{status}</span>
+                    <span className="text-[#c3902c]">{count} Leads</span>
                   </div>
-                  <div className="w-full h-2 bg-brand-cherry/40 rounded-full overflow-hidden border border-brand-copper/15">
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
                     <div 
                       style={{ width: `${percentage}%` }}
-                      className="h-full bg-brand-copper/70 rounded-full"
+                      className="h-full bg-[#c3902c]/75 rounded-full"
                     />
                   </div>
                 </div>

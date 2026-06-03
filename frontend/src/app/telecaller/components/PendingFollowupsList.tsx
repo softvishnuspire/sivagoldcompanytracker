@@ -45,19 +45,19 @@ export default function PendingFollowupsList({ leads, onEdit, onDelete }: Pendin
   return (
     <div className="space-y-6">
       {/* Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-brand-mahogany/40 border border-brand-copper/30 rounded-2xl backdrop-blur-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white border border-slate-200/80 rounded-2xl shadow-sm text-slate-800">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-slate" size={18} />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             type="text"
             placeholder="Search pending follow-ups by name, phone, district..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-brand-cherry/40 border border-brand-copper/20 rounded-xl py-2 px-10 text-sm text-brand-silver outline-none focus:border-brand-copper focus:ring-1 focus:ring-brand-copper/20 placeholder-brand-slate/40"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-10 text-sm text-slate-800 outline-none focus:border-amber-450 focus:ring-1 focus:ring-amber-500/10 placeholder-slate-400"
           />
         </div>
-        <div className="text-xs text-brand-slate font-bold uppercase tracking-wider bg-brand-mahogany border border-brand-copper/20 px-3.5 py-2 rounded-xl flex items-center gap-1.5">
-          <Clock size={14} className="text-brand-copper" />
+        <div className="text-xs text-slate-600 font-bold uppercase tracking-wider bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm">
+          <Clock size={14} className="text-amber-600" />
           Pending Completion: {pendingLeads.length}
         </div>
       </div>
@@ -73,48 +73,48 @@ export default function PendingFollowupsList({ leads, onEdit, onDelete }: Pendin
             return (
               <div 
                 key={lead.id}
-                className="bg-brand-mahogany/40 border border-brand-copper/35 hover:border-brand-copper hover:shadow-[0_8px_24px_rgba(101,72,59,0.15)] transition-all duration-300 rounded-2xl p-5 backdrop-blur-md flex flex-col justify-between gap-4"
+                className="bg-white border border-slate-200/80 hover:border-slate-350 hover:shadow-md transition-all duration-300 rounded-2xl p-5 flex flex-col justify-between gap-4 text-slate-800"
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] font-bold text-brand-silver bg-brand-copper/20 border border-brand-copper/30 py-0.5 px-2 rounded-md">
+                    <span className="font-mono text-[10px] font-bold text-slate-650 bg-slate-100 border border-slate-200 py-0.5 px-2 rounded-md">
                       {lead.leadNumber}
                     </span>
-                    <span className="text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 py-0.5 px-2 rounded font-bold uppercase tracking-wider flex items-center gap-1">
+                    <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 py-0.5 px-2 rounded font-bold uppercase tracking-wider flex items-center gap-1">
                       <AlertTriangle size={10} /> Incomplete
                     </span>
                   </div>
 
-                  <h3 className="text-base font-bold text-brand-silver mt-3 font-sans">
+                  <h3 className="text-base font-bold text-slate-800 mt-3 font-sans">
                     {lead.customerName}
                   </h3>
 
-                  <div className="space-y-1.5 mt-2">
-                    <p className="text-xs text-brand-slate flex items-center gap-1.5">
-                      <Phone size={12} className="text-brand-slate/60" /> {lead.mobile}
+                  <div className="space-y-1.5 mt-2 text-slate-500">
+                    <p className="text-xs flex items-center gap-1.5">
+                      <Phone size={12} className="text-slate-400" /> {lead.mobile}
                     </p>
-                    <p className="text-xs text-brand-slate flex items-center gap-1.5">
-                      <MapPin size={12} className="text-brand-slate/60" /> {lead.address}, {lead.district}
+                    <p className="text-xs flex items-center gap-1.5">
+                      <MapPin size={12} className="text-slate-400" /> {lead.address}, {lead.district}
                     </p>
                   </div>
 
                   {/* Warning Alerts Section */}
-                  <div className="mt-4 space-y-2 border-t border-brand-copper/10 pt-3">
-                    <span className="text-[10px] text-brand-slate font-bold uppercase tracking-wider block mb-1">
+                  <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
                       Missing Information
                     </span>
                     {isMissingGold && (
-                      <div className="text-[11px] text-amber-400/90 flex items-center gap-1 bg-amber-500/5 py-1 px-2.5 rounded-lg border border-amber-500/10">
+                      <div className="text-[11px] text-amber-800 flex items-center gap-1 bg-amber-500/10 py-1 px-2.5 rounded-lg border border-amber-500/15">
                         <AlertTriangle size={11} /> Missing Gold Details
                       </div>
                     )}
                     {isMissingBank && (
-                      <div className="text-[11px] text-amber-400/90 flex items-center gap-1 bg-amber-500/5 py-1 px-2.5 rounded-lg border border-amber-500/10">
+                      <div className="text-[11px] text-amber-800 flex items-center gap-1 bg-amber-500/10 py-1 px-2.5 rounded-lg border border-amber-500/15">
                         <AlertTriangle size={11} /> Missing Bank / Pledge Details
                       </div>
                     )}
                     {isMissingDocs && (
-                      <div className="text-[11px] text-amber-400/90 flex items-center gap-1 bg-amber-500/5 py-1 px-2.5 rounded-lg border border-amber-500/10">
+                      <div className="text-[11px] text-amber-800 flex items-center gap-1 bg-amber-500/10 py-1 px-2.5 rounded-lg border border-amber-500/15">
                         <AlertTriangle size={11} /> Missing Loan Slip / KYC Docs
                       </div>
                     )}
@@ -124,7 +124,7 @@ export default function PendingFollowupsList({ leads, onEdit, onDelete }: Pendin
                 <div className="flex gap-2.5 mt-2">
                   <button
                     onClick={() => onEdit(lead)}
-                    className="flex-1 py-2.5 bg-brand-copper hover:bg-brand-copper/85 text-brand-silver hover:text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="flex-1 py-2.5 bg-[#c3902c] hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <FileEdit size={14} />
                     Complete Details
@@ -136,7 +136,7 @@ export default function PendingFollowupsList({ leads, onEdit, onDelete }: Pendin
                         onDelete(lead.id);
                       }
                     }}
-                    className="py-2.5 px-3.5 bg-brand-mahogany hover:bg-rose-500/10 text-rose-400 hover:text-rose-500 border border-brand-copper/25 hover:border-rose-500/30 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                    className="py-2.5 px-3.5 bg-slate-50 hover:bg-rose-500/10 text-rose-600 hover:text-rose-700 border border-slate-200 hover:border-rose-300 rounded-xl transition-all cursor-pointer flex items-center justify-center"
                     title="Delete Lead"
                   >
                     <Trash2 size={15} />
@@ -146,8 +146,8 @@ export default function PendingFollowupsList({ leads, onEdit, onDelete }: Pendin
             );
           })
         ) : (
-          <div className="col-span-full py-16 text-center text-brand-slate text-xs uppercase tracking-widest bg-brand-mahogany/20 rounded-2xl border border-brand-copper/15 flex flex-col items-center justify-center gap-2.5">
-            <ClipboardList size={30} className="text-brand-slate/40" />
+          <div className="col-span-full py-16 text-center text-slate-400 text-xs uppercase tracking-widest bg-slate-55 rounded-2xl border border-slate-200 flex flex-col items-center justify-center gap-2.5 shadow-sm">
+            <ClipboardList size={30} className="text-slate-400/40" />
             No pending follow-ups with incomplete details found.
           </div>
         )}
