@@ -15,6 +15,50 @@ function toValidUuid(id) {
   return uuidRegex.test(id) ? id : null;
 }
 
+// Helper: Inspect file magic bytes to verify content matches signature
+function validateMagicBytes(buffer) {
+  if (!buffer || buffer.length < 4) return null;
+  
+  // Check PDF: %PDF
+  if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) {
+    return 'application/pdf';
+  }
+  
+  // Check PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (buffer.length >= 8 &&
+      buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47 &&
+      buffer[4] === 0x0D && buffer[5] === 0x0A && buffer[6] === 0x1A && buffer[7] === 0x0A) {
+    return 'image/png';
+  }
+  
+  // Check JPEG: FF D8 FF
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+  
+  return null;
+}
+
+// Helper: Validate Base64 document payload and match its magic bytes
+function validateBase64Document(fileUrl) {
+  if (!fileUrl || !fileUrl.startsWith('data:')) return true; // Assuming direct URL is verified on upload
+  
+  try {
+    const matches = fileUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!matches) return false;
+    
+    const mimeType = matches[1];
+    const base64Data = matches[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const detectedMime = validateMagicBytes(buffer);
+    return detectedMime === mimeType;
+  } catch (err) {
+    console.error('Base64 document validation error:', err);
+    return false;
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'shivagold_super_secret_jwt_key_2026';
@@ -684,6 +728,17 @@ app.post('/api/telecaller/leads', authenticateToken, requireRole(['TELECALLER'])
       return res.status(400).json({ error: 'Required fields are missing.' });
     }
 
+    // Validate documents for magic bytes
+    if (documents && Array.isArray(documents)) {
+      for (const d of documents) {
+        if (d.fileUrl && d.fileUrl.startsWith('data:')) {
+          if (!validateBase64Document(d.fileUrl)) {
+            return res.status(400).json({ error: 'Security Alert: Invalid document file content detected.' });
+          }
+        }
+      }
+    }
+
     const leadId = crypto.randomUUID();
     
     // Generate lead number based on count
@@ -780,6 +835,17 @@ app.put('/api/telecaller/leads/:id', authenticateToken, requireRole(['TELECALLER
       priceCommunicated,
       remarks
     } = req.body;
+
+    // Validate documents for magic bytes
+    if (documents && Array.isArray(documents)) {
+      for (const d of documents) {
+        if (d.fileUrl && d.fileUrl.startsWith('data:')) {
+          if (!validateBase64Document(d.fileUrl)) {
+            return res.status(400).json({ error: 'Security Alert: Invalid document file content detected.' });
+          }
+        }
+      }
+    }
 
     // Verify ownership
     const { data: leadCheck, error: checkError } = await supabase

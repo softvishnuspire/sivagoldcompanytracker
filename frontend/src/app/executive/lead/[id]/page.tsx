@@ -130,6 +130,20 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
   const [previewDocType, setPreviewDocType] = useState<string | null>(null);
   const [previewDocName, setPreviewDocName] = useState<string | null>(null);
   const [timelineCollapsed, setTimelineCollapsed] = useState(true);
+  const validateSelectedFile = (file: File | null): boolean => {
+    if (!file) return true;
+    const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (!fileExt || !allowedExtensions.includes(fileExt)) {
+      alert('Invalid file type. Only PDF, JPG, JPEG, and PNG files are allowed.');
+      return false;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size exceeds the 10MB limit.');
+      return false;
+    }
+    return true;
+  };
 
   const downloadDocument = (url: string, filename: string) => {
     const link = document.createElement('a');
@@ -249,30 +263,6 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
       await loadLeadDetails();
     } catch (err: any) {
       setError(err.message || 'Failed to submit fund request.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Simulation tool for MD Funds Approval (since executive cannot modify, we simulate it for UI walkthrough)
-  const handleSimulateFundsApproval = async () => {
-    setError('');
-    setSubmitting(true);
-    try {
-      // First make a fund request
-      const { data: requestRes } = await apiRequest('/executive/update-status', {
-        method: 'POST',
-        body: JSON.stringify({
-          leadId,
-          targetStatus: 'MD_FUNDS_APPROVED',
-          remarks: 'MD approved funds of ₹' + (lead?.loan_amount || 50000)
-        })
-      });
-
-      // Insert record in fund_requests and payments
-      await loadLeadDetails();
-    } catch (err: any) {
-      setError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -636,19 +626,6 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       </>
                     )}
 
-                    <div className="pt-2 border-t border-slate-100">
-                      <p className="text-[10px] text-slate-450 mb-2">Demo Simulation: Bypass wait state and approve funds</p>
-                      <button 
-                        onClick={handleSimulateFundsApproval}
-                        disabled={submitting}
-                        className="px-4 py-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-200 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
-                      >
-                        <svg className="w-3.5 h-3.5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                        SIMULATE MD FUNDS APPROVAL
-                      </button>
-                    </div>
                   </div>
                 );
               })()}
@@ -806,7 +783,16 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Agreement Copy (PDF/Image)</label>
                       <input 
                         type="file" 
-                        onChange={(e) => setAgreementCopy(e.target.files ? e.target.files[0] : null)}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setAgreementCopy(file);
+                          } else {
+                            e.target.value = '';
+                            setAgreementCopy(null);
+                          }
+                        }}
                         className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
                       />
                     </div>
@@ -814,7 +800,16 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">KYC Copy (PDF/Image)</label>
                       <input 
                         type="file" 
-                        onChange={(e) => setKycCopy(e.target.files ? e.target.files[0] : null)}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setKycCopy(file);
+                          } else {
+                            e.target.value = '';
+                            setKycCopy(null);
+                          }
+                        }}
                         className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
                       />
                     </div>
@@ -880,7 +875,16 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Payment Proof</label>
                       <input 
                         type="file" 
-                        onChange={(e) => setPaymentProof(e.target.files ? e.target.files[0] : null)}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setPaymentProof(file);
+                          } else {
+                            e.target.value = '';
+                            setPaymentProof(null);
+                          }
+                        }}
                         className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
                       />
                     </div>
@@ -1018,19 +1022,71 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Gold Image 1</label>
-                      <input type="file" onChange={(e) => setGoldImg1(e.target.files ? e.target.files[0] : null)} className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" />
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setGoldImg1(file);
+                          } else {
+                            e.target.value = '';
+                            setGoldImg1(null);
+                          }
+                        }}
+                        className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Gold Image 2</label>
-                      <input type="file" onChange={(e) => setGoldImg2(e.target.files ? e.target.files[0] : null)} className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" />
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setGoldImg2(file);
+                          } else {
+                            e.target.value = '';
+                            setGoldImg2(null);
+                          }
+                        }}
+                        className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Gold Image 3</label>
-                      <input type="file" onChange={(e) => setGoldImg3(e.target.files ? e.target.files[0] : null)} className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" />
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setGoldImg3(file);
+                          } else {
+                            e.target.value = '';
+                            setGoldImg3(null);
+                          }
+                        }}
+                        className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Gold Image 4</label>
-                      <input type="file" onChange={(e) => setGoldImg4(e.target.files ? e.target.files[0] : null)} className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" />
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setGoldImg4(file);
+                          } else {
+                            e.target.value = '';
+                            setGoldImg4(null);
+                          }
+                        }}
+                        className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" 
+                      />
                     </div>
                   </div>
                   <button 
