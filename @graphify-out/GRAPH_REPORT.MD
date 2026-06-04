@@ -186,6 +186,19 @@ graph TD
 - **MD Sidebar Logo Layout Alignment**: Fixed a sidebar logo layout issue on the Managing Director (MD) Dashboard where the fallback company name text "SHIVA GOLD CO." was rendering side-by-side with the active logo image (causing text wrapping and clipping on medium/md screens). Declared a `logoError` state variable to conditionally display the company name text only when the image fails to load.
 - **Removed MD Funds Approval Simulation**: Completely removed the "SIMULATE MD FUNDS APPROVAL" button and its underlying handler function `handleSimulateFundsApproval` from the Field Executive Lead Details workflow view (`frontend/src/app/executive/lead/[id]/page.tsx`) to ensure status transitions rely exclusively on the actual MD panel authorization flow.
 - **File Upload Validation & Magic Bytes Verification**: Secured the application against malicious file uploads. Enforced file extension and size validation (10MB limit) on both Telecaller and Executive frontends, adding native `accept` attributes to file input elements. Added server-side MIME type filtering via Multer and implemented robust binary magic bytes verification to inspect file headers on the backend, checking for JPEG, PNG, and PDF signatures for both multipart/form-data and Base64 inline documents.
+- **MD Document Preview and Download Fix**: Resolved document selection button and preview layout bugs on the Managing Director (MD) Dashboard. Configured the document button mapping to support both snake_case (`file_url`) and camelCase (`fileUrl`) properties, resolving selection highlight and loading errors. Implemented a custom inline downloader and safe original file viewer to bypass browser security blocks on Base64/Data URLs, and added support for displaying external seed image URLs.
+- **RM Dashboard Mock Data Removal**: Removed all remaining mock and static data from the Regional Manager (RM) Dashboard workspace:
+  - Made the header date display dynamic, replacing the hardcoded '02 June 2026, Monday'.
+  - Initialized the profile state with clean, empty parameters to prevent placeholder details showing before the API fetch completes.
+  - Dynamically computed avatar initials from the loaded profile object rather than using static 'RK'.
+  - Discarded a duplicate IIFE donut chart element inside the 'Lead Status Summary' container.
+  - Linked the 'Executives' register view to render real DB status and database employee codes rather than indices and hardcoded 'Active' labels. Updated the backend RM executives endpoint to fetch `employee_code`.
+  - Upgraded the 'Lead Sources' tab to dynamically compute lead volume counts per source from database leads rather than hardcoding static mock listings. Added a 'Total Leads' count column to the view.
+- **MD TypeScript Compiler Fix**: Resolved an implicit `any` type compilation error (`Parameter 'd' implicitly has an 'any' type`) in the documents search callback inside [md/page.tsx](file:///c:/sivagoldcompanytracker/frontend/src/app/md/page.tsx#L1070) by explicitly annotating the parameter `d` with the type `any` (i.e. `(d: any)`).
+
+
+
+
 
 
 

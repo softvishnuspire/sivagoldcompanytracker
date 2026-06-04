@@ -243,7 +243,7 @@ export default function MDDashboard() {
         const data = await res.json();
         setLeadDetail(data);
         if (data.documents && data.documents.length > 0) {
-          setPreviewDoc(data.documents[0].file_url);
+          setPreviewDoc(data.documents[0].file_url || data.documents[0].fileUrl || '#');
         } else {
           setPreviewDoc(null);
         }
@@ -613,6 +613,29 @@ export default function MDDashboard() {
   const triggerExport = (format: 'excel' | 'pdf') => {
     // We append the auth token in query params to authenticate PDF/Excel downloads in browser
     window.open(getExportUrl(format), '_blank');
+  };
+
+  const handleOpenOriginal = (url: string) => {
+    if (!url) return;
+    if (url.startsWith('data:')) {
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.document.write(`<img src="${url}" style="max-width:100%; max-height:100%; object-fit:contain;" alt="Original Document" />`);
+        newWindow.document.title = "Original Document";
+        newWindow.document.close();
+      }
+    } else {
+      window.open(url, '_blank', 'noreferrer');
+    }
+  };
+
+  const downloadDocument = (url: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename.replace(/\s+/g, '_');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filteredLeads = leads.filter(l => 
@@ -1004,23 +1027,26 @@ export default function MDDashboard() {
                         {leadDetail.documents.length === 0 ? (
                           <span className="text-xs text-slate-400 italic">No documents uploaded.</span>
                         ) : (
-                          leadDetail.documents.map((doc: Document) => (
-                            <button
-                              key={doc.id}
-                              onClick={() => setPreviewDoc(doc.file_url)}
-                              className={`w-full flex items-center justify-between p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                                previewDoc === doc.file_url
-                                  ? 'bg-amber-500/5 border-amber-500/30 text-amber-700'
-                                  : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-350'
-                              }`}
-                            >
-                              <div className="flex flex-col gap-0.5 min-w-0">
-                                <span className="text-xs font-bold truncate">{doc.document_type.replace(/_/g, ' ')}</span>
-                                <span className="text-[9px] text-slate-400 font-mono">Click to Preview</span>
-                              </div>
-                              <span className="text-xs">👁️</span>
-                            </button>
-                          ))
+                          leadDetail.documents.map((doc: Document) => {
+                            const fileUrl = doc.file_url || (doc as any).fileUrl || '#';
+                            return (
+                              <button
+                                key={doc.id}
+                                onClick={() => setPreviewDoc(fileUrl)}
+                                className={`w-full flex items-center justify-between p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                                  previewDoc === fileUrl
+                                    ? 'bg-amber-500/5 border-amber-500/30 text-amber-700'
+                                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-350'
+                                }`}
+                              >
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                  <span className="text-xs font-bold truncate">{doc.document_type.replace(/_/g, ' ')}</span>
+                                  <span className="text-[9px] text-slate-400 font-mono">Click to Preview</span>
+                                </div>
+                                <span className="text-xs">👁️</span>
+                              </button>
+                            );
+                          })
                         )}
                       </div>
 
@@ -1028,13 +1054,32 @@ export default function MDDashboard() {
                         {previewDoc ? (
                           <div className="w-full h-full flex flex-col gap-2">
                             <div className="flex justify-between items-center text-[10px] text-slate-400 border-b border-slate-200 pb-1.5">
-                              <span>In-App Preview</span>
-                              <a href={previewDoc} download target="_blank" rel="noreferrer" className="text-amber-600 font-bold hover:underline">
-                                Open in New Tab ↗
-                              </a>
+                              <span>Document Live View</span>
+                              <div className="flex gap-2.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenOriginal(previewDoc)}
+                                  className="text-amber-600 font-bold hover:underline cursor-pointer bg-transparent border-0 p-0"
+                                >
+                                  Open Original file
+                                </button>
+                                <span className="text-slate-350 select-none">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const activeDoc = leadDetail.documents.find((d: any) => (d.file_url || (d as any).fileUrl || '#') === previewDoc);
+                                    const docType = activeDoc ? activeDoc.document_type : 'Document';
+                                    const fileName = `${leadDetail.lead.customer_name}_${docType}`;
+                                    downloadDocument(previewDoc, fileName);
+                                  }}
+                                  className="text-amber-600 font-bold hover:underline cursor-pointer bg-transparent border-0 p-0"
+                                >
+                                  Download File
+                                </button>
+                              </div>
                             </div>
                             <div className="flex-1 relative w-full h-[180px] sm:h-[220px] bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center">
-                              {previewDoc.startsWith('data:image') || previewDoc.includes('.png') || previewDoc.includes('.jpg') || previewDoc.includes('.jpeg') ? (
+                              {previewDoc.startsWith('data:image') || previewDoc.includes('.png') || previewDoc.includes('.jpg') || previewDoc.includes('.jpeg') || previewDoc.startsWith('http') ? (
                                 <img
                                   src={previewDoc}
                                   alt="Document Preview"
