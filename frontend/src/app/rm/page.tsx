@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import DocumentManager from '@/components/DocumentManager';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import Button from '@/components/ui/Button';
+import { TableSkeleton, CardSkeleton } from '@/components/ui/SkeletonLoaders';
 
 // =========================================================================
 // TYPES & INTERFACES
@@ -412,9 +416,67 @@ export default function RMDashboard() {
   };
 
   // Submit Operations
-  const handleApproveLead = async () => {
-    if (!selectedLeadId) return;
-    try {
+  const queryClient = useQueryClient();
+
+  // React Query fetch for tab list leads
+  const { data: leadsData = [], isLoading: isTabListLoading } = useQuery({
+    queryKey: ['rm', 'leads', activeTab],
+    queryFn: async () => {
+      let url = '';
+      if (activeTab === 'pending' || activeTab === 'pending-verify') url = 'http://localhost:5000/api/rm/pending-leads';
+      else if (activeTab === 'approved') url = 'http://localhost:5000/api/rm/approved-leads';
+      else if (activeTab === 'reverify') url = 'http://localhost:5000/api/rm/reverification-leads';
+      else if (activeTab === 'rejected') url = 'http://localhost:5000/api/rm/rejected-leads';
+      else if (activeTab === 'completed') url = 'http://localhost:5000/api/rm/completed-leads';
+      else if (activeTab === 'assignment') url = 'http://localhost:5000/api/rm/approved-leads';
+      else if (activeTab === 'all-leads') {
+        const resPending = await authenticatedFetch('http://localhost:5000/api/rm/pending-leads');
+        const resApproved = await authenticatedFetch('http://localhost:5000/api/rm/approved-leads');
+        const pending = resPending.ok ? await resPending.json() : [];
+        const approved = resApproved.ok ? await resApproved.json() : [];
+        return [...pending, ...approved];
+      }
+
+      if (!url) return [];
+      const res = await authenticatedFetch(url);
+      if (!res.ok) throw new Error("Failed to fetch leads");
+      return res.json();
+    },
+    enabled: activeTab !== 'dashboard' && activeTab !== 'executives-list' && activeTab !== 'lead-sources' && activeTab !== 'activity-log' && activeTab !== 'profile' && activeTab !== 'document-manager',
+  });
+
+  // React Query fetch for dashboard statistics
+  const { data: statsDataQuery, isLoading: isStatsLoading } = useQuery<DashboardStats>({
+    queryKey: ['rm', 'dashboardStats'],
+    queryFn: async () => {
+      const res = await authenticatedFetch('http://localhost:5000/api/rm/dashboard');
+      if (!res.ok) throw new Error("Failed to fetch dashboard stats");
+      return res.json();
+    },
+    enabled: activeTab === 'dashboard' || activeTab === 'activity-log',
+  });
+
+  // Sync Query Data back to legacy state variables
+  useEffect(() => {
+    if (leadsData) {
+      if (activeTab === 'pending' || activeTab === 'pending-verify') setPendingLeads(leadsData);
+      else if (activeTab === 'approved') setApprovedLeads(leadsData);
+      else if (activeTab === 'reverify') setReverifyLeads(leadsData);
+      else if (activeTab === 'rejected') setRejectedLeads(leadsData);
+      else if (activeTab === 'completed') setCompletedLeads(leadsData);
+      else if (activeTab === 'assignment') setApprovedLeads(leadsData);
+      else if (activeTab === 'all-leads') setAllLeadsList(leadsData);
+    }
+  }, [leadsData, activeTab]);
+
+  useEffect(() => {
+    if (statsDataQuery) {
+      setStatsData(statsDataQuery);
+    }
+  }, [statsDataQuery]);
+
+  const approveMutation = useMutation({
+    mutationFn: async () => {
       const res = await authenticatedFetch('http://localhost:5000/api/rm/approve', {
         method: 'POST',
         body: JSON.stringify({
@@ -423,23 +485,31 @@ export default function RMDashboard() {
           approvalNotes
         })
       });
-
-      if (res.ok) {
-        setActionType(null);
-        setRemarks('');
-        setApprovalNotes('');
-        closeInspection();
-        fetchTabList(activeTab);
-        fetchDashboardData();
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to approve lead");
       }
-    } catch (err) {
-      console.error(err);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Lead Approved Successfully");
+      setActionType(null);
+      setRemarks('');
+      setApprovalNotes('');
+      closeInspection();
+      queryClient.invalidateQueries({ queryKey: ['rm'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to approve lead");
     }
+  });
+
+  const handleApproveLead = async () => {
+    approveMutation.mutate();
   };
 
-  const handleReverifyLead = async () => {
-    if (!selectedLeadId) return;
-    try {
+  const reverifyMutation = useMutation({
+    mutationFn: async () => {
       const res = await authenticatedFetch('http://localhost:5000/api/rm/reverify', {
         method: 'POST',
         body: JSON.stringify({
@@ -449,23 +519,31 @@ export default function RMDashboard() {
           remarks
         })
       });
-
-      if (res.ok) {
-        setActionType(null);
-        setRemarks('');
-        setReverifyReqInfo('');
-        closeInspection();
-        fetchTabList(activeTab);
-        fetchDashboardData();
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to reverify lead");
       }
-    } catch (err) {
-      console.error(err);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Lead Reverification Sent");
+      setActionType(null);
+      setRemarks('');
+      setReverifyReqInfo('');
+      closeInspection();
+      queryClient.invalidateQueries({ queryKey: ['rm'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to submit reverification");
     }
+  });
+
+  const handleReverifyLead = async () => {
+    reverifyMutation.mutate();
   };
 
-  const handleRejectLead = async () => {
-    if (!selectedLeadId) return;
-    try {
+  const rejectMutation = useMutation({
+    mutationFn: async () => {
       const res = await authenticatedFetch('http://localhost:5000/api/rm/reject', {
         method: 'POST',
         body: JSON.stringify({
@@ -474,22 +552,30 @@ export default function RMDashboard() {
           remarks
         })
       });
-
-      if (res.ok) {
-        setActionType(null);
-        setRemarks('');
-        closeInspection();
-        fetchTabList(activeTab);
-        fetchDashboardData();
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to reject lead");
       }
-    } catch (err) {
-      console.error(err);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Lead Rejected Successfully");
+      setActionType(null);
+      setRemarks('');
+      closeInspection();
+      queryClient.invalidateQueries({ queryKey: ['rm'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to reject lead");
     }
+  });
+
+  const handleRejectLead = async () => {
+    rejectMutation.mutate();
   };
 
-  const handleAssignExecutive = async (leadId: string, execId: string) => {
-    if (!leadId || !execId) return;
-    try {
+  const assignMutation = useMutation({
+    mutationFn: async ({ leadId, execId }: { leadId: string; execId: string }) => {
       const res = await authenticatedFetch('http://localhost:5000/api/rm/assign-executive', {
         method: 'POST',
         body: JSON.stringify({
@@ -497,15 +583,26 @@ export default function RMDashboard() {
           executiveId: execId
         })
       });
-
-      if (res.ok) {
-        setSelectedExecutiveId('');
-        fetchTabList(activeTab);
-        fetchDashboardData();
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to assign executive");
       }
-    } catch (err) {
-      console.error(err);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Executive Assigned Successfully");
+      setSelectedExecutiveId('');
+      setActionType(null);
+      closeInspection();
+      queryClient.invalidateQueries({ queryKey: ['rm'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to assign executive");
     }
+  });
+
+  const handleAssignExecutive = async (leadId: string, execId: string) => {
+    assignMutation.mutate({ leadId, execId });
   };
 
   // Status Badge Formatter
@@ -710,10 +807,15 @@ export default function RMDashboard() {
 
         {/* Dashboard Panels */}
         <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-32 gap-3">
-              <div className="w-10 h-10 border-4 border-amber-500/25 border-t-[#c3902c] rounded-full animate-spin" />
-              <span className="text-sm font-semibold text-slate-400">Loading modules...</span>
+          {loading || isTabListLoading || isStatsLoading ? (
+            <div className="space-y-6">
+              {activeTab === 'dashboard' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <CardSkeleton count={6} />
+                </div>
+              ) : (
+                <TableSkeleton rows={8} cols={6} />
+              )}
             </div>
           ) : inspecting && leadDetail ? (
             
@@ -1784,12 +1886,14 @@ export default function RMDashboard() {
                   >
                     Cancel
                   </button>
-                  <button
+                  <Button
                     onClick={handleApproveLead}
-                    className="px-4 py-2 bg-[#c3902c] text-white rounded-xl text-xs font-bold hover:bg-amber-600 cursor-pointer shadow-md"
+                    state={approveMutation.isPending ? "loading" : "idle"}
+                    loadingText="Approving..."
+                    className="px-4 py-2 text-xs font-bold shadow-md h-9"
                   >
                     Confirm Approval
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -1841,12 +1945,14 @@ export default function RMDashboard() {
                   >
                     Cancel
                   </button>
-                  <button
+                  <Button
                     onClick={handleReverifyLead}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 cursor-pointer shadow-md"
+                    state={reverifyMutation.isPending ? "loading" : "idle"}
+                    loadingText="Sending..."
+                    className="px-4 py-2 text-xs font-bold shadow-md h-9 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500"
                   >
                     Send Back
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -1888,12 +1994,14 @@ export default function RMDashboard() {
                   >
                     Cancel
                   </button>
-                  <button
+                  <Button
                     onClick={handleRejectLead}
-                    className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 cursor-pointer shadow-md"
+                    state={rejectMutation.isPending ? "loading" : "idle"}
+                    loadingText="Rejecting..."
+                    className="px-4 py-2 text-xs font-bold shadow-md h-9 bg-rose-600 hover:bg-rose-700 focus:ring-rose-500"
                   >
                     Confirm Rejection
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -1926,19 +2034,19 @@ export default function RMDashboard() {
                   >
                     Cancel
                   </button>
-                  <button
+                  <Button
                     onClick={() => {
                       if (selectedLeadId) {
                         handleAssignExecutive(selectedLeadId, selectedExecutiveId);
-                        setActionType(null);
-                        closeInspection();
                       }
                     }}
                     disabled={!selectedExecutiveId}
-                    className="px-4 py-2 bg-indigo-600 text-white disabled:opacity-50 disabled:pointer-events-none rounded-xl text-xs font-bold hover:bg-indigo-700 cursor-pointer shadow-md"
+                    state={assignMutation.isPending ? "loading" : "idle"}
+                    loadingText="Assigning..."
+                    className="px-4 py-2 text-xs font-bold shadow-md h-9 bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500"
                   >
                     Confirm Assignment
-                  </button>
+                  </Button>
                 </div>
               </>
             )}

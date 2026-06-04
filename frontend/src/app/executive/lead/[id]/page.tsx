@@ -3,6 +3,9 @@
 import React, { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiRequest } from '../../../../lib/api';
+import { toast } from 'sonner';
+import { TableSkeleton } from '../../../../components/ui/SkeletonLoaders';
+
 
 interface TimelineEvent {
   id: string;
@@ -78,6 +81,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [optimisticTimelineEntry, setOptimisticTimelineEntry] = useState<TimelineEvent | null>(null);
 
   // Form states for each step
   const [callNotes, setCallNotes] = useState('');
@@ -187,6 +191,15 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
   const handleStatusChange = async (targetStatus: string, payload: any) => {
     setError('');
     setSubmitting(true);
+
+    // Timeline optimistic entry:
+    setOptimisticTimelineEntry({
+      id: 'optimistic',
+      status: targetStatus,
+      remarks: 'Updating status... (Updating...)',
+      created_at: new Date().toISOString()
+    });
+
     try {
       // Choose correct endpoint or general update-status
       let endpoint = '/executive/update-status';
@@ -235,6 +248,17 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
 
       await apiRequest(endpoint, options);
       
+      // Update optimistic entry to Success:
+      setOptimisticTimelineEntry({
+        id: 'optimistic-success',
+        status: targetStatus,
+        remarks: 'Completed ✓',
+        created_at: new Date().toISOString()
+      });
+      setTimeout(() => setOptimisticTimelineEntry(null), 2000);
+      
+      toast.success(`Status updated to ${targetStatus.replace(/_/g, ' ')} successfully!`);
+
       // Reload
       await loadLeadDetails();
       
@@ -245,6 +269,17 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
       setVerificationNotes('');
     } catch (err: any) {
       setError(err.message);
+      
+      // Update optimistic entry to Failed:
+      setOptimisticTimelineEntry({
+        id: 'optimistic-failed',
+        status: targetStatus,
+        remarks: `Failed ✗ (${err.message})`,
+        created_at: new Date().toISOString()
+      });
+      setTimeout(() => setOptimisticTimelineEntry(null), 3000);
+      
+      toast.error(`Failed to update status: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -273,9 +308,10 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
       // Reload lead details
       await loadLeadDetails();
       
-      alert('Bank image proof uploaded successfully!');
+      toast.success('Bank image proof uploaded successfully!');
     } catch (err: any) {
       setError(err.message || 'Failed to upload bank image');
+      toast.error(err.message || 'Failed to upload bank image');
     } finally {
       setSubmitting(false);
     }
@@ -288,6 +324,14 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
     }
     setError('');
     setSubmitting(true);
+
+    setOptimisticTimelineEntry({
+      id: 'optimistic',
+      status: 'FUND_REQUEST_SUBMITTED',
+      remarks: `Requesting buyout funds of ₹${requestedAmount}... (Updating...)`,
+      created_at: new Date().toISOString()
+    });
+
     try {
       await apiRequest('/executive/request-funds', {
         method: 'POST',
@@ -296,10 +340,30 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
           requestedAmount: Number(requestedAmount)
         })
       });
+
+      setOptimisticTimelineEntry({
+        id: 'optimistic-success',
+        status: 'FUND_REQUEST_SUBMITTED',
+        remarks: 'Completed ✓',
+        created_at: new Date().toISOString()
+      });
+      setTimeout(() => setOptimisticTimelineEntry(null), 2000);
+
+      toast.success("Fund request submitted successfully!");
       setRequestedAmount('');
       await loadLeadDetails();
     } catch (err: any) {
       setError(err.message || 'Failed to submit fund request.');
+
+      setOptimisticTimelineEntry({
+        id: 'optimistic-failed',
+        status: 'FUND_REQUEST_SUBMITTED',
+        remarks: `Failed ✗ (${err.message})`,
+        created_at: new Date().toISOString()
+      });
+      setTimeout(() => setOptimisticTimelineEntry(null), 3000);
+
+      toast.error(err.message || 'Failed to submit fund request.');
     } finally {
       setSubmitting(false);
     }
@@ -307,9 +371,17 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <div className="w-10 h-10 rounded-full border-4 border-amber-500/25 border-t-amber-500 animate-spin"></div>
-        <p className="text-amber-500/50 text-xs font-mono tracking-wider uppercase">Loading Case Details...</p>
+      <div className="space-y-6 p-6 animate-pulse">
+        <div className="h-10 w-1/3 bg-slate-200 rounded-xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <TableSkeleton rows={4} cols={4} />
+            <div className="h-40 bg-slate-250 bg-slate-200 rounded-2xl" />
+          </div>
+          <div>
+            <TableSkeleton rows={6} cols={2} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -1241,6 +1313,23 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
             `}>
               
               <div className="absolute left-3.5 top-2 bottom-2 w-0.5 bg-slate-200 z-0"></div>
+
+              {optimisticTimelineEntry && (
+                <div className="flex gap-4 relative z-10 animate-pulse pb-4">
+                  <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500 text-[#c3902c] flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                    🕒
+                  </div>
+                  <div className="space-y-1 py-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#c3902c] uppercase text-[10px] font-bold tracking-wider">
+                        {optimisticTimelineEntry.status.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-slate-455 text-[9px]">Just now</span>
+                    </div>
+                    <p className="text-slate-600 font-sans text-xs font-semibold">{optimisticTimelineEntry.remarks}</p>
+                  </div>
+                </div>
+              )}
 
               {lead.lead_timeline && lead.lead_timeline.length > 0 ? (
                 lead.lead_timeline.map((event, idx) => {

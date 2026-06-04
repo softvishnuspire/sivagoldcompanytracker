@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiRequest } from '../../../lib/api';
+import { TableSkeleton } from '../../../components/ui/SkeletonLoaders';
+
 
 interface PaymentDetails {
   id: string;
@@ -54,9 +56,9 @@ export default function PaymentsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <div className="w-10 h-10 rounded-full border-4 border-amber-500/25 border-t-amber-500 animate-spin"></div>
-        <p className="text-amber-500/50 text-xs font-mono tracking-wider uppercase">Loading Payments Ledger...</p>
+      <div className="space-y-6 animate-pulse p-6">
+        <div className="h-10 w-1/4 bg-slate-200 rounded-xl" />
+        <TableSkeleton rows={6} cols={7} />
       </div>
     );
   }

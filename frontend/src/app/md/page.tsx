@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import DocumentManager from '@/components/DocumentManager';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import Button from '@/components/ui/Button';
+import { TableSkeleton, CardSkeleton, LineChartSkeleton, DonutChartSkeleton, FunnelChartSkeleton } from '@/components/ui/SkeletonLoaders';
+
 import {
   ResponsiveContainer,
   LineChart,
@@ -911,9 +916,35 @@ export default function MDDashboard() {
         <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
           
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-32 gap-3">
-              <div className="w-10 h-10 border-4 border-amber-500/25 border-t-[#c3902c] rounded-full animate-spin" />
-              <span className="text-sm font-semibold text-slate-400">Loading metrics...</span>
+            <div className="space-y-6">
+              {activeTab === 'dashboard' ? (
+                <div className="space-y-6">
+                  {/* Top Stats Row */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <CardSkeleton count={4} />
+                  </div>
+                  {/* Charts Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2">
+                      <LineChartSkeleton />
+                    </div>
+                    <div>
+                      <DonutChartSkeleton />
+                    </div>
+                  </div>
+                  {/* Bottom Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div>
+                      <FunnelChartSkeleton />
+                    </div>
+                    <div className="lg:col-span-2">
+                      <TableSkeleton rows={4} cols={4} />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <TableSkeleton rows={8} cols={6} />
+              )}
             </div>
           ) : inspecting && leadDetail ? (
             

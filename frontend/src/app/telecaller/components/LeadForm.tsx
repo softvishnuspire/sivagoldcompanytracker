@@ -1,20 +1,21 @@
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Coins, 
   Building2, 
   FileText, 
-  Upload, 
-  Loader2, 
   CheckCircle2, 
   AlertCircle,
   Plus
 } from 'lucide-react';
 import { Lead, Document } from '../types';
-import { supabase } from '../../../lib/supabaseClient';
+import FileUploader from '../../../components/ui/FileUploader';
+import Button from '../../../components/ui/Button';
 
 interface LeadFormProps {
-  onSave: (lead: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
+  onSave: (lead: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => void | Promise<void>;
   editingLead?: Lead | null;
   onCancel: () => void;
 }
@@ -45,6 +46,8 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
   }>({});
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formStatus, setFormStatus] = useState<"Not Started" | "In Progress" | "Saved" | "Submitted">("Not Started");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (editingLead) {
@@ -76,12 +79,18 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         };
       });
       setUploadedFiles(docs);
+      setFormStatus("Saved");
+    } else {
+      setFormStatus("Not Started");
     }
   }, [editingLead]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (formStatus === "Not Started") {
+      setFormStatus("In Progress");
+    }
     if (errors[name]) {
       setErrors(prev => {
         const copy = { ...prev };
@@ -89,76 +98,6 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         return copy;
       });
     }
-  };
-
-  const handleRealFileUpload = async (
-    type: 'LOAN_SLIP' | 'KYC' | 'ADDITIONAL',
-    file: File
-  ) => {
-    const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
-    const fileExt = file.name.split('.').pop()?.toLowerCase();
-    if (!fileExt || !allowedExtensions.includes(fileExt)) {
-      alert('Invalid file type. Only PDF, JPG, JPEG, and PNG files are allowed.');
-      return;
-    }
-
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      alert('File size exceeds the 10MB limit.');
-      return;
-    }
-
-    // Set initial loading state
-    setUploadedFiles(prev => ({
-      ...prev,
-      [type]: { name: file.name, progress: 30, done: false }
-    }));
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const isConfigured = supabaseUrl && supabaseUrl.startsWith('http') && supabaseAnonKey;
-
-    if (isConfigured) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-      const filePath = `documents/${fileName}`;
-
-      try {
-        // 1. Try uploading to Supabase Storage
-        const { data, error } = await supabase.storage
-          .from('loan-documents')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: true
-          });
-
-        if (error) throw error;
-
-        // 2. Get public url
-        const { data: urlData } = supabase.storage
-          .from('loan-documents')
-          .getPublicUrl(filePath);
-
-        setUploadedFiles(prev => ({
-          ...prev,
-          [type]: { name: file.name, progress: 100, done: true, url: urlData.publicUrl }
-        }));
-        return; // Successful online upload
-      } catch (err) {
-        console.warn('Supabase storage upload failed. Falling back to local Base64 storage.', err);
-      }
-    }
-
-    // Fallback: Read file as Base64 Data URL
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64data = reader.result as string;
-      setUploadedFiles(prev => ({
-        ...prev,
-        [type]: { name: file.name, progress: 100, done: true, url: base64data }
-      }));
-    };
-    reader.readAsDataURL(file);
   };
 
   const validateStep = (step: number): boolean => {
@@ -207,6 +146,9 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
   const handleNext = () => {
     if (validateStep(activeStep)) {
       setActiveStep(prev => prev + 1);
+      if (formStatus === "Not Started") {
+        setFormStatus("In Progress");
+      }
     }
   };
 
@@ -214,9 +156,13 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
     setActiveStep(prev => prev - 1);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep(activeStep)) return;
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setFormStatus("Submitted");
 
     // Build documents array
     const documents: Document[] = [];
@@ -234,53 +180,71 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
       }
     });
 
-    onSave({
-      id: editingLead?.id,
-      customerName: formData.customerName.trim(),
-      mobile: formData.mobile.trim(),
-      alternateMobile: formData.alternateMobile.trim() || undefined,
-      address: formData.address.trim(),
-      district: formData.district,
-      goldWeight: parseFloat(formData.goldWeight),
-      goldType: formData.goldType,
-      estimatedValue: parseFloat(formData.estimatedValue),
-      bankName: formData.bankName.trim(),
-      branchName: formData.branchName.trim(),
-      loanAmount: parseFloat(formData.loanAmount),
-      loanAccountNumber: formData.loanAccountNumber.trim(),
-      source: formData.source || undefined,
-      status: formData.status,
-      telecallerId: editingLead?.telecallerId || 'TC-01',
-      rmId: editingLead?.rmId,
-      executiveId: editingLead?.executiveId,
-      documents
-    });
+    try {
+      await onSave({
+        id: editingLead?.id,
+        customerName: formData.customerName.trim(),
+        mobile: formData.mobile.trim(),
+        alternateMobile: formData.alternateMobile.trim() || undefined,
+        address: formData.address.trim(),
+        district: formData.district,
+        goldWeight: parseFloat(formData.goldWeight),
+        goldType: formData.goldType,
+        estimatedValue: parseFloat(formData.estimatedValue),
+        bankName: formData.bankName.trim(),
+        branchName: formData.branchName.trim(),
+        loanAmount: parseFloat(formData.loanAmount),
+        loanAccountNumber: formData.loanAccountNumber.trim(),
+        source: formData.source || undefined,
+        status: formData.status,
+        telecallerId: editingLead?.telecallerId || 'TC-01',
+        rmId: editingLead?.rmId,
+        executiveId: editingLead?.executiveId,
+        documents
+      });
+      setFormStatus("Saved");
+    } catch (err) {
+      setFormStatus("In Progress");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSaveAsPendingFollowup = () => {
+  const handleSaveAsPendingFollowup = async () => {
     if (!validateStep(1)) return;
+    if (isSubmitting) return;
 
-    onSave({
-      id: editingLead?.id,
-      customerName: formData.customerName.trim(),
-      mobile: formData.mobile.trim(),
-      alternateMobile: formData.alternateMobile.trim() || undefined,
-      address: formData.address.trim(),
-      district: formData.district,
-      goldWeight: parseFloat(formData.goldWeight) || 0,
-      goldType: formData.goldType || 'Jewelry (22K)',
-      estimatedValue: parseFloat(formData.estimatedValue) || 0,
-      bankName: formData.bankName.trim() || '',
-      branchName: formData.branchName.trim() || '',
-      loanAmount: parseFloat(formData.loanAmount) || 0,
-      loanAccountNumber: formData.loanAccountNumber.trim() || '',
-      source: formData.source || undefined,
-      status: 'FOLLOWUP_IN_PROGRESS',
-      telecallerId: editingLead?.telecallerId || 'TC-01',
-      rmId: editingLead?.rmId,
-      executiveId: editingLead?.executiveId,
-      documents: []
-    });
+    setIsSubmitting(true);
+    setFormStatus("Submitted");
+
+    try {
+      await onSave({
+        id: editingLead?.id,
+        customerName: formData.customerName.trim(),
+        mobile: formData.mobile.trim(),
+        alternateMobile: formData.alternateMobile.trim() || undefined,
+        address: formData.address.trim(),
+        district: formData.district,
+        goldWeight: parseFloat(formData.goldWeight) || 0,
+        goldType: formData.goldType || 'Jewelry (22K)',
+        estimatedValue: parseFloat(formData.estimatedValue) || 0,
+        bankName: formData.bankName.trim() || '',
+        branchName: formData.branchName.trim() || '',
+        loanAmount: parseFloat(formData.loanAmount) || 0,
+        loanAccountNumber: formData.loanAccountNumber.trim() || '',
+        source: formData.source || undefined,
+        status: 'FOLLOWUP_IN_PROGRESS',
+        telecallerId: editingLead?.telecallerId || 'TC-01',
+        rmId: editingLead?.rmId,
+        executiveId: editingLead?.executiveId,
+        documents: []
+      });
+      setFormStatus("Saved");
+    } catch (err) {
+      setFormStatus("In Progress");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const steps = [
@@ -291,8 +255,20 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
   ];
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm max-w-3xl mx-auto w-full text-slate-800">
-      <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200">
+    <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm max-w-3xl mx-auto w-full text-slate-800 relative">
+      {/* Form Status Badge */}
+      <div className="absolute top-6 right-6">
+        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border tracking-wider transition-colors duration-200 ${
+          formStatus === "Not Started" ? "bg-slate-100 text-slate-600 border-slate-200" :
+          formStatus === "In Progress" ? "bg-amber-50 text-amber-700 border-amber-300" :
+          formStatus === "Saved" ? "bg-blue-50 text-blue-700 border-blue-300" :
+          "bg-emerald-50 text-emerald-700 border-emerald-300"
+        }`}>
+          {formStatus}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200 mr-24">
         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
           <span className="p-2 rounded-lg bg-amber-500/10 text-amber-700 border border-amber-500/30 animate-scaleUp">
             <Plus size={20} />
@@ -301,11 +277,12 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         </h2>
         <button
           type="button"
+          disabled={isSubmitting}
           onClick={(e) => {
             e.preventDefault();
             onCancel();
           }}
-          className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Cancel
         </button>
@@ -335,6 +312,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
               <div className="flex flex-col items-center gap-1.5 relative">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={(e) => {
                     e.preventDefault();
                     let valid = true;
@@ -349,7 +327,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                       setActiveStep(s.num);
                     }
                   }}
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-300 cursor-pointer ${
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-300 cursor-pointer disabled:opacity-50 ${
                     isCompleted
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 font-bold shadow-sm'
                       : isActive
@@ -390,10 +368,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 <input
                   type="text"
                   name="customerName"
+                  disabled={isSubmitting}
                   value={formData.customerName}
                   onChange={handleInputChange}
                   placeholder="e.g. Anil Kumar"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 ${
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
                     errors.customerName ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
@@ -410,9 +389,10 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 </label>
                 <select
                   name="district"
+                  disabled={isSubmitting}
                   value={formData.district}
                   onChange={handleInputChange}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 disabled:opacity-60"
                 >
                   <option value="Vijayawada">Vijayawada</option>
                   <option value="Hyderabad">Hyderabad</option>
@@ -430,10 +410,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                   type="text"
                   name="mobile"
                   maxLength={10}
+                  disabled={isSubmitting}
                   value={formData.mobile}
                   onChange={handleInputChange}
                   placeholder="e.g. 9876543210"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 ${
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
                     errors.mobile ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
@@ -452,10 +433,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                   type="text"
                   name="alternateMobile"
                   maxLength={10}
+                  disabled={isSubmitting}
                   value={formData.alternateMobile}
                   onChange={handleInputChange}
                   placeholder="e.g. 8765432109"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 ${
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
                     errors.alternateMobile ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
@@ -474,10 +456,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
               <textarea
                 name="address"
                 rows={3}
+                disabled={isSubmitting}
                 value={formData.address}
                 onChange={handleInputChange}
                 placeholder="Street address, Flat number, Landmark details..."
-                className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 resize-none ${
+                className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 resize-none disabled:opacity-60 ${
                   errors.address ? 'border-rose-500/50' : 'border-slate-200'
                 }`}
               />
@@ -494,9 +477,10 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
               </label>
               <select
                 name="source"
+                disabled={isSubmitting}
                 value={formData.source}
                 onChange={handleInputChange}
-                className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
+                className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 disabled:opacity-60"
               >
                 <option value="">Select source (optional)</option>
                 <option value="Website">Website</option>
@@ -525,10 +509,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                   type="number"
                   step="0.01"
                   name="goldWeight"
+                  disabled={isSubmitting}
                   value={formData.goldWeight}
                   onChange={handleInputChange}
                   placeholder="e.g. 45.80"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 ${
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
                     errors.goldWeight ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
@@ -545,9 +530,10 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 </label>
                 <select
                   name="goldType"
+                  disabled={isSubmitting}
                   value={formData.goldType}
                   onChange={handleInputChange}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 disabled:opacity-60"
                 >
                   <option value="Jewelry (22K)">Jewelry (22K)</option>
                   <option value="Gold Coins (24K)">Gold Coins (24K)</option>
@@ -563,10 +549,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 <input
                   type="number"
                   name="estimatedValue"
+                  disabled={isSubmitting}
                   value={formData.estimatedValue}
                   onChange={handleInputChange}
                   placeholder="e.g. 250000"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 ${
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
                     errors.estimatedValue ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
@@ -594,10 +581,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 <input
                   type="text"
                   name="bankName"
+                  disabled={isSubmitting}
                   value={formData.bankName}
                   onChange={handleInputChange}
                   placeholder="e.g. Muthoot Finance, SBI"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 ${
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
                     errors.bankName ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
@@ -615,10 +603,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 <input
                   type="text"
                   name="branchName"
+                  disabled={isSubmitting}
                   value={formData.branchName}
                   onChange={handleInputChange}
                   placeholder="e.g. Benz Circle Branch"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 ${
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
                     errors.branchName ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
@@ -636,10 +625,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 <input
                   type="number"
                   name="loanAmount"
+                  disabled={isSubmitting}
                   value={formData.loanAmount}
                   onChange={handleInputChange}
                   placeholder="e.g. 150000"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 ${
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
                     errors.loanAmount ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
@@ -657,10 +647,11 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 <input
                   type="text"
                   name="loanAccountNumber"
+                  disabled={isSubmitting}
                   value={formData.loanAccountNumber}
                   onChange={handleInputChange}
                   placeholder="e.g. LN1029384756"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 ${
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
                     errors.loanAccountNumber ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
@@ -683,66 +674,38 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
             
             <div className="space-y-4">
               {[
-                { type: 'LOAN_SLIP' as const, label: 'Loan Slip / Bank Pledge Slip', placeholder: 'loan_slip.pdf' },
-                { type: 'KYC' as const, label: 'KYC Document (Aadhaar/PAN)', placeholder: 'aadhaar_card.pdf' },
-                { type: 'ADDITIONAL' as const, label: 'Additional Documents (Purity test report, etc.)', placeholder: 'receipt.png' }
+                { type: 'LOAN_SLIP' as const, label: 'Loan Slip / Bank Pledge Slip' },
+                { type: 'KYC' as const, label: 'KYC Document (Aadhaar/PAN)' },
+                { type: 'ADDITIONAL' as const, label: 'Additional Documents (Purity test report, etc.)' }
               ].map((docType) => {
                 const file = uploadedFiles[docType.type];
                 return (
-                  <div key={docType.type} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200 gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-800">{docType.label}</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {file ? `${file.name} (${file.progress}%)` : 'No file selected'}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {file ? (
-                        <div className="flex items-center gap-2">
-                          {!file.done ? (
-                            <Loader2 className="animate-spin text-amber-500" size={18} />
-                          ) : (
-                            <span className="text-xs text-emerald-700 bg-emerald-500/10 py-1 px-2.5 rounded-full border border-emerald-500/10 font-medium flex items-center gap-1">
-                              <CheckCircle2 size={12} /> Uploaded
-                            </span>
-                          )}
-                          {file.done && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setUploadedFiles(prev => {
-                                    const copy = { ...prev };
-                                    delete copy[docType.type];
-                                    return copy;
-                                  });
-                              }}
-                              className="text-xs text-slate-400 hover:text-rose-600 transition-colors cursor-pointer font-semibold"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <label className="flex items-center gap-1.5 text-xs text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-350 transition-all font-semibold py-1.5 px-3 rounded-lg cursor-pointer">
-                          <Upload size={13} /> Select File
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={(e) => {
-                              const selectedFile = e.target.files?.[0];
-                              if (selectedFile) {
-                                handleRealFileUpload(docType.type, selectedFile);
-                              }
-                            }}
-                          />
-                        </label>
-                      )}
-                    </div>
-                  </div>
+                  <FileUploader
+                    key={docType.type}
+                    label={docType.label}
+                    documentType={docType.type}
+                    initialUrl={file?.url || ""}
+                    initialName={file?.name || ""}
+                    onUploadSuccess={(url, name) => {
+                      if (formStatus === "Not Started") {
+                        setFormStatus("In Progress");
+                      }
+                      setUploadedFiles(prev => ({
+                        ...prev,
+                        [docType.type]: { name, progress: 100, done: true, url }
+                      }));
+                    }}
+                    onRemove={() => {
+                      if (formStatus === "Not Started") {
+                        setFormStatus("In Progress");
+                      }
+                      setUploadedFiles(prev => {
+                        const copy = { ...prev };
+                        delete copy[docType.type];
+                        return copy;
+                      });
+                    }}
+                  />
                 );
               })}
             </div>
@@ -755,11 +718,12 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
             {activeStep > 1 && (
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={(e) => {
                   e.preventDefault();
                   handleBack();
                 }}
-                className="px-5 py-2.5 rounded-xl text-sm font-medium border border-slate-200 bg-white text-slate-650 hover:bg-slate-50 hover:text-slate-800 transition-colors cursor-pointer"
+                className="px-5 py-2.5 rounded-xl text-sm font-medium border border-slate-200 bg-white text-slate-650 hover:bg-slate-50 hover:text-slate-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Back
               </button>
@@ -768,8 +732,10 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
 
           <div className="flex gap-2">
             {activeStep === 1 && (
-              <button
+              <Button
                 type="button"
+                state={isSubmitting ? "loading" : "idle"}
+                loadingText="Adding..."
                 onClick={(e) => {
                   e.preventDefault();
                   handleSaveAsPendingFollowup();
@@ -777,26 +743,30 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
               >
                 Add to pending follow ups
-              </button>
+              </Button>
             )}
             {activeStep < 4 ? (
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={(e) => {
                   e.preventDefault();
                   handleNext();
                 }}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[#c3902c] hover:bg-amber-600 text-white transition-colors shadow-md cursor-pointer"
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[#c3902c] hover:bg-amber-600 text-white transition-colors shadow-md cursor-pointer disabled:opacity-50"
               >
                 Next Step
               </button>
             ) : (
-              <button
+              <Button
                 type="submit"
+                state={isSubmitting ? "loading" : "idle"}
+                loadingText={editingLead ? "Saving..." : "Creating..."}
+                successText={editingLead ? "Saved ✓" : "Created ✓"}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[#c3902c] hover:bg-amber-600 text-white transition-colors shadow-md cursor-pointer"
               >
                 {editingLead ? 'Save Changes' : 'Create & Save Lead'}
-              </button>
+              </Button>
             )}
           </div>
         </div>

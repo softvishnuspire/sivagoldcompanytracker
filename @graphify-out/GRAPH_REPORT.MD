@@ -196,6 +196,14 @@ graph TD
   - Upgraded the 'Lead Sources' tab to dynamically compute lead volume counts per source from database leads rather than hardcoding static mock listings. Added a 'Total Leads' count column to the view.
 - **MD TypeScript Compiler Fix**: Resolved an implicit `any` type compilation error (`Parameter 'd' implicitly has an 'any' type`) in the documents search callback inside [md/page.tsx](file:///c:/sivagoldcompanytracker/frontend/src/app/md/page.tsx#L1070) by explicitly annotating the parameter `d` with the type `any` (i.e. `(d: any)`).
 - **MD Fund Approval Loan Amount Sync**: Fixed a bug where when the MD accepted a fund request and modified the requested amount, the new approved amount was not saved in the `leads.loan_amount` column. Updated the MD fund approval endpoint (`POST /api/md/fund-approval`) and the executive status update endpoint (`POST /api/executive/update-status`) to persist the approved fund amount to `leads.loan_amount` so the Field Executive dashboard receives and pre-fills the correct approved value.
+- **Global UI/UX Refinement System**: Refactored the entire Shiva Gold application to provide professional, enterprise-grade UX:
+  - Installed and configured `@tanstack/react-query`, `sonner`, `nprogress`, and `react-loading-skeleton` globally inside a root `ClientProviders.tsx` layout wrapper.
+  - Implemented an `OfflineIndicator` floating alert and network speeds checker at the root level.
+  - Hooked `nprogress` to start on API fetches and route transitions using programmatic counter handles in `api.ts`.
+  - Added a state-based luxury themed `Button` component supporting loading/success/error statuses and click locks to prevent double-submissions.
+  - Created custom `SkeletonLoaders` mirroring Recharts line, donut, and funnel shapes, plus table rows and stat cards to eliminate blank screen jumps.
+  - Developed a progress-based `FileUploader` using native browser file reading and XMLHttpRequest upload tracking (0% to 100%).
+  - Upgraded Telecaller, RM, Executive, and MD dashboards to use React Query hooks, optimistic timeline transitions (Updating... -> Completed/Failed), Sonner toast feedback, and skeleton loaders.
 
 
 

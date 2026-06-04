@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiRequest } from '../../lib/api';
+import { CardSkeleton } from '../../components/ui/SkeletonLoaders';
+
 
 interface DashboardData {
   assignedLeads: number;
@@ -52,9 +54,11 @@ export default function ExecutiveDashboard() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <div className="w-10 h-10 rounded-full border-4 border-amber-500/25 border-t-[#c3902c] animate-spin"></div>
-        <p className="text-amber-600/70 text-xs font-mono tracking-wider uppercase animate-pulse">Loading Statistics...</p>
+      <div className="space-y-6 animate-pulse p-6">
+        <div className="h-24 w-full bg-slate-200 rounded-3xl" />
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+          <CardSkeleton count={6} />
+        </div>
       </div>
     );
   }

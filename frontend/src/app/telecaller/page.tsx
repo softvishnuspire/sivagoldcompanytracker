@@ -8,35 +8,34 @@ import {
   FileText, 
   BarChart3, 
   LogOut, 
-  User, 
   LayoutDashboard,
   Bell,
   Menu,
   X,
-  Phone,
-  Coins,
   Clock
 } from 'lucide-react';
-import { Lead, LeadStatus, DashboardStats, Followup } from './types';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
+import { Lead, LeadStatus, DashboardStats } from './types';
 // Import components
 import StatsOverview from './components/StatsOverview';
 import LeadForm from './components/LeadForm';
 import LeadList from './components/LeadList';
-
 import ReportsView from './components/ReportsView';
 import PendingFollowupsList from './components/PendingFollowupsList';
 import DocumentManager from '@/components/DocumentManager';
+import { TableSkeleton, CardSkeleton } from '../../components/ui/SkeletonLoaders';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function TelecallerDashboard() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'pending-followups' | 'reports' | 'document-manager'>('dashboard');
-  const [leads, setLeads] = useState<Lead[]>([]);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
-  const [activeCallLead, setActiveCallLead] = useState<Lead | null>(null);
   
   // Current logged in agent session
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -73,7 +72,6 @@ export default function TelecallerDashboard() {
   };
 
   const mapDbToLead = (db: any): Lead => {
-    // Map documents
     const documents = (db.documents || []).map((doc: any) => ({
       id: doc.id,
       leadId: doc.lead_id,
@@ -84,7 +82,6 @@ export default function TelecallerDashboard() {
       createdAt: doc.created_at
     }));
 
-    // Map interactions into followups
     const followups = (db.interactions || [])
       .filter((i: any) => i.interaction_type === 'FOLLOWUP' || i.interaction_type === 'CALL')
       .map((i: any) => ({
@@ -97,7 +94,6 @@ export default function TelecallerDashboard() {
         createdAt: i.created_at
       }));
 
-    // Extract latest RM reverification remarks from timeline
     const reverificationTimeline = (db.timeline || [])
       .filter((t: any) => t.status === 'RM_REVERIFICATION')
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -160,24 +156,7 @@ export default function TelecallerDashboard() {
     return res;
   };
 
-  const fetchLeads = async () => {
-    try {
-      const res = await authenticatedFetch(`${API_BASE}/telecaller/leads`);
-      if (!res.ok) {
-        throw new Error('Failed to fetch leads');
-      }
-      const dbLeads = await res.json();
-      const mapped = dbLeads.map(mapDbToLead);
-      setLeads(mapped);
-      setDbConnected(true);
-    } catch (err) {
-      console.error('Fetch leads failed:', err);
-      setDbConnected(false);
-      setLeads([]);
-    }
-  };
-
-  // Initialize and load
+  // Authenticate user session
   useEffect(() => {
     const token = localStorage.getItem('siva_token');
     const sessionUser = localStorage.getItem('siva_user');
@@ -196,9 +175,22 @@ export default function TelecallerDashboard() {
       window.location.href = '/';
       return;
     }
-
-    fetchLeads();
   }, []);
+
+  // React Query Fetch Leads
+  const { data: leads = [], isLoading: isLeadsLoading } = useQuery<Lead[]>({
+    queryKey: ['telecaller', 'leads'],
+    queryFn: async () => {
+      const res = await authenticatedFetch(`${API_BASE}/telecaller/leads`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch leads');
+      }
+      const dbLeads = await res.json();
+      setDbConnected(true);
+      return dbLeads.map(mapDbToLead);
+    },
+    enabled: !!currentUser,
+  });
 
   // Helper to compute stats dynamically
   const getStats = (): DashboardStats => {
@@ -225,12 +217,11 @@ export default function TelecallerDashboard() {
     return { newLeads, pendingFollowups, qualifiedLeads, rejectedLeads, sentToRM };
   };
 
-  const handleSaveLead = async (formData: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
-    try {
+  // Save Lead Mutation
+  const saveLeadMutation = useMutation({
+    mutationFn: async (formData: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
       let res;
       if (formData.id) {
-        // Editing lead
-        // Transition status back to SENT_TO_RM if it was RM_REVERIFICATION
         const targetStatus = formData.status === 'RM_REVERIFICATION' ? 'SENT_TO_RM' : formData.status;
         res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${formData.id}`, {
           method: 'PUT',
@@ -252,7 +243,6 @@ export default function TelecallerDashboard() {
           })
         });
       } else {
-        // Creating new lead
         res = await authenticatedFetch(`${API_BASE}/telecaller/leads`, {
           method: 'POST',
           body: JSON.stringify({
@@ -276,26 +266,35 @@ export default function TelecallerDashboard() {
       if (!res.ok) {
         throw new Error('Failed to save lead');
       }
-
-      await fetchLeads();
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['telecaller', 'leads'] });
+      toast.success("Lead Saved Successfully");
       setEditingLead(null);
       setActiveTab('leads-list');
-    } catch (err) {
+    },
+    onError: (err: any) => {
       console.error('Save lead failed:', err);
-      alert('Error saving lead details to backend server.');
+      toast.error(err.message || "Failed to save lead details to backend server.");
     }
+  });
+
+  const handleSaveLead = async (formData: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
+    await saveLeadMutation.mutateAsync(formData);
   };
 
-  const handleUpdateLeadStatus = async (
-    leadId: string, 
-    status: LeadStatus, 
-    remarks?: string,
-    customerInterest?: string,
-    priceCommunicated?: boolean
-  ) => {
-    try {
+  // Update Status Mutation (with Optimistic UI Rollback)
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ leadId, status, remarks, customerInterest, priceCommunicated }: {
+      leadId: string;
+      status: LeadStatus;
+      remarks?: string;
+      customerInterest?: string;
+      priceCommunicated?: boolean;
+    }) => {
       const leadToUpdate = leads.find(l => l.id === leadId);
-      if (!leadToUpdate) return;
+      if (!leadToUpdate) throw new Error("Lead not found");
 
       const res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${leadId}`, {
         method: 'PUT',
@@ -322,16 +321,48 @@ export default function TelecallerDashboard() {
       if (!res.ok) {
         throw new Error('Failed to update lead status');
       }
+      return res.json();
+    },
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ['telecaller', 'leads'] });
+      const previousLeads = queryClient.getQueryData<Lead[]>(['telecaller', 'leads']);
 
-      await fetchLeads();
-    } catch (err) {
-      console.error('Update status failed:', err);
-      alert('Failed to update lead status on the server.');
+      if (previousLeads) {
+        queryClient.setQueryData<Lead[]>(
+          ['telecaller', 'leads'],
+          previousLeads.map(l => l.id === variables.leadId ? { ...l, status: variables.status } : l)
+        );
+      }
+
+      return { previousLeads };
+    },
+    onError: (err, variables, context: any) => {
+      if (context?.previousLeads) {
+        queryClient.setQueryData(['telecaller', 'leads'], context.previousLeads);
+      }
+      toast.error(err.message || "Failed to update lead status on the server.");
+    },
+    onSuccess: () => {
+      toast.success("Status Updated Successfully");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['telecaller', 'leads'] });
     }
+  });
+
+  const handleUpdateLeadStatus = async (
+    leadId: string, 
+    status: LeadStatus, 
+    remarks?: string,
+    customerInterest?: string,
+    priceCommunicated?: boolean
+  ) => {
+    updateStatusMutation.mutate({ leadId, status, remarks, customerInterest, priceCommunicated });
   };
 
-  const handleAddFollowup = async (leadId: string, date: string, remarks: string) => {
-    try {
+  // Add Followup Mutation
+  const addFollowupMutation = useMutation({
+    mutationFn: async ({ leadId, date, remarks }: { leadId: string; date: string; remarks: string }) => {
       const res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${leadId}/followup`, {
         method: 'POST',
         body: JSON.stringify({ date, remarks })
@@ -340,47 +371,29 @@ export default function TelecallerDashboard() {
       if (!res.ok) {
         throw new Error('Failed to add followup');
       }
-
-      await fetchLeads();
-    } catch (err) {
-      console.error('Add followup failed:', err);
-      alert('Failed to add followup interaction log.');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['telecaller', 'leads'] });
+      toast.success("Follow-up Interaction Logged Successfully");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to add followup interaction log.");
     }
-  };
+  });
 
-  const handleCompleteFollowup = async (leadId: string, followupId: string, remarks: string) => {
-    try {
-      const res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${leadId}/complete-followup`, {
-        method: 'POST',
-        body: JSON.stringify({ remarks })
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to complete followup');
-      }
-
-      await fetchLeads();
-    } catch (err) {
-      console.error('Complete followup failed:', err);
-      alert('Failed to complete followup call.');
-    }
+  const handleAddFollowup = async (leadId: string, date: string, remarks: string) => {
+    addFollowupMutation.mutate({ leadId, date, remarks });
   };
 
   const handleDeleteLead = async (leadId: string) => {
-    // Currently the backend does not have a DELETE endpoint.
-    // We log this action and refresh the lead list.
     console.warn('Delete lead requested for:', leadId, '— no backend DELETE endpoint available yet.');
-    alert('Lead deletion is not supported yet. Contact your administrator.');
+    toast.error('Lead deletion is not supported yet. Contact your administrator.');
   };
 
   const handleEditLeadTrigger = (lead: Lead) => {
     setEditingLead(lead);
     setActiveTab('add-lead');
-  };
-
-  const triggerCallSimulationFromFollowup = (lead: Lead) => {
-    setActiveTab('leads-list');
-    setActiveCallLead(lead);
   };
 
   const stats = getStats();
@@ -548,7 +561,13 @@ export default function TelecallerDashboard() {
           <div className="flex-1 space-y-6">
             {activeTab === 'dashboard' && (
               <div className="space-y-8 animate-fadeIn">
-                <StatsOverview stats={stats} onSelectTab={(tab) => setActiveTab(tab)} />
+                {isLeadsLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <CardSkeleton count={5} />
+                  </div>
+                ) : (
+                  <StatsOverview stats={stats} onSelectTab={(tab) => setActiveTab(tab)} />
+                )}
                 
                 {/* Dashboard Summary cards */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -560,36 +579,43 @@ export default function TelecallerDashboard() {
                     </div>
 
                     <div className="space-y-3.5">
-                      {leads.filter(lead => {
-                        const isFollowup = lead.status === 'FOLLOWUP_IN_PROGRESS';
-                        const isMissingDetails = 
-                          lead.goldWeight === 0 || 
-                          !lead.bankName || 
-                          lead.loanAmount === 0 ||
-                          !lead.documents || 
-                          lead.documents.length === 0;
-                        return isFollowup && isMissingDetails;
-                      }).slice(0, 3).map((lead, index) => (
-                        <div key={index} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 flex items-center justify-center font-bold text-xs">
-                              {lead.customerName.charAt(0)}
-                            </div>
-                            <div>
-                              <h4 className="text-xs font-bold text-slate-800">{lead.customerName}</h4>
-                              <p className="text-[10px] text-slate-500 mt-0.5">{lead.mobile} | {lead.district}</p>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => handleEditLeadTrigger(lead)}
-                            className="flex items-center gap-1.5 py-1.5 px-3.5 rounded-lg bg-[#c3902c] hover:bg-amber-600 text-white text-[10px] font-bold transition-all cursor-pointer shadow-sm"
-                          >
-                            Complete Details
-                          </button>
+                      {isLeadsLoading ? (
+                        <div className="space-y-2">
+                          <div className="h-10 w-full rounded bg-slate-100 animate-pulse" />
+                          <div className="h-10 w-full rounded bg-slate-100 animate-pulse" />
                         </div>
-                      ))}
-                      {leads.filter(lead => {
+                      ) : (
+                        leads.filter(lead => {
+                          const isFollowup = lead.status === 'FOLLOWUP_IN_PROGRESS';
+                          const isMissingDetails = 
+                            lead.goldWeight === 0 || 
+                            !lead.bankName || 
+                            lead.loanAmount === 0 ||
+                            !lead.documents || 
+                            lead.documents.length === 0;
+                          return isFollowup && isMissingDetails;
+                        }).slice(0, 3).map((lead, index) => (
+                          <div key={index} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 flex items-center justify-center font-bold text-xs">
+                                {lead.customerName.charAt(0)}
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-bold text-slate-800">{lead.customerName}</h4>
+                                <p className="text-[10px] text-slate-500 mt-0.5">{lead.mobile} | {lead.district}</p>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => handleEditLeadTrigger(lead)}
+                              className="flex items-center gap-1.5 py-1.5 px-3.5 rounded-lg bg-[#c3902c] hover:bg-amber-600 text-white text-[10px] font-bold transition-all cursor-pointer shadow-sm"
+                            >
+                              Complete Details
+                            </button>
+                          </div>
+                        ))
+                      )}
+                      {!isLeadsLoading && leads.filter(lead => {
                         const isFollowup = lead.status === 'FOLLOWUP_IN_PROGRESS';
                         const isMissingDetails = 
                           lead.goldWeight === 0 || 
@@ -661,25 +687,31 @@ export default function TelecallerDashboard() {
 
             {activeTab === 'leads-list' && (
               <div className="animate-fadeIn">
-                <LeadList
-                  leads={leads}
-                  onEdit={handleEditLeadTrigger}
-                  onUpdateStatus={handleUpdateLeadStatus}
-                  onAddFollowup={handleAddFollowup}
-                  onDelete={handleDeleteLead}
-                />
+                {isLeadsLoading ? (
+                  <TableSkeleton rows={5} cols={5} />
+                ) : (
+                  <LeadList
+                    leads={leads}
+                    onEdit={handleEditLeadTrigger}
+                    onUpdateStatus={handleUpdateLeadStatus}
+                    onAddFollowup={handleAddFollowup}
+                    onDelete={handleDeleteLead}
+                  />
+                )}
               </div>
             )}
 
-
-
             {activeTab === 'pending-followups' && (
               <div className="animate-fadeIn">
-                <PendingFollowupsList
-                  leads={leads}
-                  onEdit={handleEditLeadTrigger}
-                  onDelete={handleDeleteLead}
-                />
+                {isLeadsLoading ? (
+                  <TableSkeleton rows={3} cols={4} />
+                ) : (
+                  <PendingFollowupsList
+                    leads={leads}
+                    onEdit={handleEditLeadTrigger}
+                    onDelete={handleDeleteLead}
+                  />
+                )}
               </div>
             )}
 
