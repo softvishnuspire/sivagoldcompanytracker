@@ -8,6 +8,9 @@ import {
   Line,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -130,6 +133,7 @@ export default function MDDashboard() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isClient, setIsClient] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [logoError, setLogoError] = useState<boolean>(false);
 
   // Auth states
   const [profile, setProfile] = useState<any>({ name: 'MD Shiva Gold', employee_code: 'MD001', role: 'MD' });
@@ -205,22 +209,6 @@ export default function MDDashboard() {
     return res;
   };
 
-  const loadInitialData = async () => {
-    setLoading(true);
-    try {
-      // Load user profile from stored user info or backend
-      const userStr = localStorage.getItem('siva_user');
-      if (userStr) {
-        setProfile(JSON.parse(userStr));
-      }
-      await fetchDashboardStats();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchDashboardStats = async () => {
     try {
       const res = await authenticatedFetch('http://localhost:5000/api/md/dashboard');
@@ -233,8 +221,8 @@ export default function MDDashboard() {
     }
   };
 
-  const fetchLeads = async () => {
-    setLoading(true);
+  const fetchLeads = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const res = await authenticatedFetch('http://localhost:5000/api/md/leads');
       if (res.ok) {
@@ -244,7 +232,7 @@ export default function MDDashboard() {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
@@ -265,8 +253,8 @@ export default function MDDashboard() {
     }
   };
 
-  const fetchFundRequests = async () => {
-    setLoading(true);
+  const fetchFundRequests = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const res = await authenticatedFetch('http://localhost:5000/api/md/fund-requests');
       if (res.ok) {
@@ -276,12 +264,12 @@ export default function MDDashboard() {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
-  const fetchRevenueData = async () => {
-    setLoading(true);
+  const fetchRevenueData = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const res = await authenticatedFetch('http://localhost:5000/api/md/revenue');
       if (res.ok) {
@@ -291,12 +279,12 @@ export default function MDDashboard() {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
-  const fetchGoldData = async () => {
-    setLoading(true);
+  const fetchGoldData = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const res = await authenticatedFetch('http://localhost:5000/api/md/gold-collection');
       if (res.ok) {
@@ -306,12 +294,12 @@ export default function MDDashboard() {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
-  const fetchEmpPerformance = async () => {
-    setLoading(true);
+  const fetchEmpPerformance = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const res = await authenticatedFetch('http://localhost:5000/api/md/employee-performance');
       if (res.ok) {
@@ -321,18 +309,53 @@ export default function MDDashboard() {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
-  const fetchBranchPerformance = async () => {
-    setLoading(true);
+  const fetchBranchPerformance = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     try {
       const res = await authenticatedFetch('http://localhost:5000/api/md/branch-performance');
       if (res.ok) {
         const data = await res.json();
         setBranchPerformance(data);
       }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  };
+
+  const loadDashboardData = async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    try {
+      await Promise.all([
+        fetchDashboardStats(),
+        fetchLeads(true),
+        fetchFundRequests(true),
+        fetchRevenueData(true),
+        fetchGoldData(true),
+        fetchEmpPerformance(true),
+        fetchBranchPerformance(true)
+      ]);
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  };
+
+  const loadInitialData = async () => {
+    setLoading(true);
+    try {
+      // Load user profile from stored user info or backend
+      const userStr = localStorage.getItem('siva_user');
+      if (userStr) {
+        setProfile(JSON.parse(userStr));
+      }
+      await loadDashboardData(true);
     } catch (err) {
       console.error(err);
     } finally {
@@ -385,7 +408,7 @@ export default function MDDashboard() {
 
   useEffect(() => {
     if (activeTab === 'dashboard') {
-      fetchDashboardStats();
+      loadDashboardData();
     } else if (activeTab === 'leads') {
       fetchLeads();
     } else if (activeTab === 'funds') {
@@ -598,6 +621,131 @@ export default function MDDashboard() {
     (l.district && l.district.toLowerCase().includes(leadsSearch.toLowerCase()))
   );
 
+  // Dynamic business calculations derived from real database states
+  const getExecutiveActivity = (status: string) => {
+    switch (status) {
+      case 'EXECUTIVE_ASSIGNED':
+        return { status: 'Assigned', activity: 'Awaiting Contact', color: 'bg-blue-100 text-blue-700' };
+      case 'CUSTOMER_CALLED':
+        return { status: 'Contacted', activity: 'Scheduling Visit', color: 'bg-indigo-100 text-indigo-700' };
+      case 'VISIT_CONFIRMED':
+        return { status: 'Scheduled', activity: 'Awaiting Funds', color: 'bg-amber-100 text-amber-700' };
+      case 'MD_FUNDS_APPROVED':
+        return { status: 'Funds Approved', activity: 'Awaiting Journey', color: 'bg-emerald-100 text-emerald-700' };
+      case 'JOURNEY_STARTED':
+        return { status: 'En Route', activity: 'Traveling to Customer', color: 'bg-[#4d0711]/10 text-[#4d0711]' };
+      case 'REACHED_CUSTOMER':
+        return { status: 'At Customer', activity: 'Meeting Customer', color: 'bg-teal-100 text-teal-700' };
+      case 'CUSTOMER_INTERACTION':
+        return { status: 'Interacting', activity: 'Verifying Gold', color: 'bg-indigo-100 text-indigo-700' };
+      case 'BANK_VISIT':
+        return { status: 'At Bank', activity: 'Releasing Gold', color: 'bg-amber-100 text-amber-700' };
+      case 'AGREEMENT_PENDING':
+        return { status: 'Agreement', activity: 'Signing Paperwork', color: 'bg-orange-100 text-orange-700' };
+      case 'PAYMENT_COMPLETED':
+        return { status: 'Paying', activity: 'Completing Payment', color: 'bg-emerald-100 text-emerald-700' };
+      case 'GOLD_RECEIVED':
+        return { status: 'Gold Recd', activity: 'Receiving Gold', color: 'bg-teal-100 text-teal-700' };
+      case 'BALANCE_SETTLED':
+        return { status: 'Settled', activity: 'Settling Balance', color: 'bg-purple-100 text-purple-700' };
+      case 'IMAGES_UPLOADED':
+        return { status: 'Completed', activity: 'Images Uploaded', color: 'bg-emerald-100 text-emerald-700' };
+      case 'CASE_COMPLETED':
+        return { status: 'Closed', activity: 'Case Finished', color: 'bg-slate-100 text-slate-700' };
+      default:
+        return { status: status.replace(/_/g, ' '), activity: 'Active Operation', color: 'bg-slate-100 text-slate-700' };
+    }
+  };
+
+  const liveExecutiveStatusList = leads
+    .filter(l => l.executive && l.current_status !== 'CASE_COMPLETED' && l.current_status !== 'RM_REJECTED')
+    .map(l => {
+      const act = getExecutiveActivity(l.current_status);
+      return {
+        id: l.id,
+        name: l.executive?.name || 'Executive',
+        avatar: l.executive?.name?.[0]?.toUpperCase() || '👨',
+        status: act.status,
+        statusColor: act.color,
+        activity: act.activity,
+        cases: leads.filter(x => x.executive_id === l.executive_id).length
+      };
+    })
+    .filter((v, i, a) => a.findIndex(t => t.name === v.name) === i)
+    .slice(0, 5);
+
+  const funnelStages = stats ? [
+    { name: 'Leads Received', value: stats.totalLeads, percentage: 100, color: 'bg-[#4d0711]' },
+    { name: 'RM Approved', value: stats.rmApprovedLeads, percentage: stats.totalLeads > 0 ? Math.round((stats.rmApprovedLeads / stats.totalLeads) * 100) : 0, color: 'bg-[#c3902c]' },
+    { name: 'Executive Assigned', value: leads.filter(l => l.current_status === 'EXECUTIVE_ASSIGNED').length, percentage: stats.totalLeads > 0 ? Math.round((leads.filter(l => l.current_status === 'EXECUTIVE_ASSIGNED').length / stats.totalLeads) * 100) : 0, color: 'bg-[#7c9e31]' },
+    { name: 'In Progress', value: leads.filter(l => ['MD_FUNDS_APPROVED', 'MD_FUNDS_REJECTED', 'RM_REVERIFICATION', 'JOURNEY_STARTED', 'REACHED_CUSTOMER', 'CUSTOMER_INTERACTION', 'BANK_VISIT', 'AGREEMENT_PENDING', 'PAYMENT_COMPLETED', 'GOLD_RECEIVED', 'BALANCE_SETTLED', 'IMAGES_UPLOADED'].includes(l.current_status)).length, percentage: stats.totalLeads > 0 ? Math.round((leads.filter(l => ['MD_FUNDS_APPROVED', 'MD_FUNDS_REJECTED', 'RM_REVERIFICATION', 'JOURNEY_STARTED', 'REACHED_CUSTOMER', 'CUSTOMER_INTERACTION', 'BANK_VISIT', 'AGREEMENT_PENDING', 'PAYMENT_COMPLETED', 'GOLD_RECEIVED', 'BALANCE_SETTLED', 'IMAGES_UPLOADED'].includes(l.current_status)).length / stats.totalLeads) * 100) : 0, color: 'bg-[#3b82f6]' },
+    { name: 'Completed', value: stats.completedCases, percentage: stats.totalLeads > 0 ? Math.round((stats.completedCases / stats.totalLeads) * 100) : 0, color: 'bg-[#8b5cf6]' },
+  ] : [];
+
+  const businessSummary = stats ? [
+    { name: 'Leads Received', value: stats.totalLeads, icon: '👥', color: 'text-blue-600' },
+    { name: 'RM Approved', value: stats.rmApprovedLeads, icon: '✅', color: 'text-emerald-600' },
+    { name: 'Executive Assigned', value: leads.filter(l => l.current_status === 'EXECUTIVE_ASSIGNED').length, icon: '👨‍💼', color: 'text-amber-600' },
+    { name: 'In Progress', value: leads.filter(l => ['MD_FUNDS_APPROVED', 'MD_FUNDS_REJECTED', 'RM_REVERIFICATION', 'JOURNEY_STARTED', 'REACHED_CUSTOMER', 'CUSTOMER_INTERACTION', 'BANK_VISIT', 'AGREEMENT_PENDING', 'PAYMENT_COMPLETED', 'GOLD_RECEIVED', 'BALANCE_SETTLED', 'IMAGES_UPLOADED'].includes(l.current_status)).length, icon: '⏳', color: 'text-indigo-600' },
+    { name: 'Completed Cases', value: stats.completedCases, icon: '🏆', color: 'text-purple-600' },
+  ] : [];
+
+  const businessHighlights = stats ? [
+    { name: 'Gold Collected Today', value: `${stats.goldCollectedToday.toFixed(2)} g`, icon: '🌟', color: 'text-amber-500' },
+    { name: 'Revenue Today', value: `₹${stats.revenueToday.toLocaleString('en-IN')}`, icon: '💰', color: 'text-emerald-500' },
+    { name: 'Monthly Gold', value: `${(goldData.month || 0).toFixed(2)} g`, icon: '🌟', color: 'text-amber-600' },
+    { name: 'Monthly Revenue', value: `₹${(revenueData.month || 0).toLocaleString('en-IN')}`, icon: '📈', color: 'text-orange-500' },
+    { name: 'Conversion Rate', value: `${stats.conversionRate}%`, icon: '🎯', color: 'text-teal-500' },
+  ] : [];
+
+  const getLeadSourcesData = () => {
+    const sourcesMap: { [key: string]: number } = {};
+    leads.forEach(l => {
+      const src = l.source || 'Direct / Walk-in';
+      sourcesMap[src] = (sourcesMap[src] || 0) + 1;
+    });
+    const colors = ['#4d0711', '#c3902c', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#64748b'];
+    return Object.keys(sourcesMap).map((name, index) => ({
+      name,
+      value: sourcesMap[name],
+      color: colors[index % colors.length]
+    }));
+  };
+
+  const leadSourcesList = getLeadSourcesData();
+
+  const sortedExecPerformanceList = empPerformance?.executive
+    ? [...empPerformance.executive]
+        .sort((a, b) => b.completedCases - a.completedCases || b.goldCollected - a.goldCollected)
+        .slice(0, 5)
+    : [];
+
+  const dynamicAlertsList = (() => {
+    const pendingFunds = fundRequests.filter(r => r.status === 'PENDING').length;
+    const reverifications = leads.filter(l => l.current_status === 'RM_REVERIFICATION').length;
+    const sentToRm = leads.filter(l => l.current_status === 'SENT_TO_RM').length;
+    const execAssigned = leads.filter(l => l.current_status === 'EXECUTIVE_ASSIGNED').length;
+
+    const alerts = [];
+    if (pendingFunds > 0) {
+      alerts.push({ id: 1, text: 'Pending Fund Requests', count: String(pendingFunds).padStart(2, '0'), color: 'text-[#4d0711]', bg: 'bg-rose-50 border border-rose-100', icon: '❗' });
+    }
+    if (reverifications > 0) {
+      alerts.push({ id: 2, text: 'Re-verification Pending', count: String(reverifications).padStart(2, '0'), color: 'text-amber-700', bg: 'bg-amber-50 border border-amber-100', icon: '🔄' });
+    }
+    if (sentToRm > 0) {
+      alerts.push({ id: 3, text: 'Awaiting RM Review', count: String(sentToRm).padStart(2, '0'), color: 'text-slate-600', bg: 'bg-slate-50 border border-slate-100', icon: '⏳' });
+    }
+    if (execAssigned > 0) {
+      alerts.push({ id: 4, text: 'Executive Assigned', count: String(execAssigned).padStart(2, '0'), color: 'text-blue-600', bg: 'bg-blue-50 border border-blue-100', icon: '🏃' });
+    }
+
+    if (alerts.length === 0) {
+      alerts.push({ id: 0, text: 'All Operations Clear', count: '00', color: 'text-emerald-700', bg: 'bg-emerald-50 border border-emerald-100', icon: '✅' });
+    }
+    return alerts;
+  })();
+
   return (
     <div suppressHydrationWarning className="h-screen w-screen overflow-hidden flex bg-[#f4f5f8] text-slate-800 font-sans selection:bg-[#c3902c] selection:text-black">
       
@@ -617,10 +765,16 @@ export default function MDDashboard() {
         {/* Branding Header */}
         <div className="py-2 px-4 border-b border-[#691823]/20 flex flex-col items-center justify-center bg-[#4d0b13]/10">
           <div className="w-full h-36 flex items-center justify-center overflow-hidden">
-            <img src="/logo.png" alt="Shiva Gold Logo" className="w-full h-auto" onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }} />
-            <span className="text-xl font-black text-amber-500 tracking-wider font-mono">SHIVA GOLD CO.</span>
+            {!logoError ? (
+              <img
+                src="/logo.png"
+                alt="Shiva Gold Logo"
+                className="w-full h-auto"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <span className="text-xl font-black text-amber-500 tracking-wider font-mono">SHIVA GOLD CO.</span>
+            )}
           </div>
         </div>
 
@@ -1037,19 +1191,284 @@ export default function MDDashboard() {
                     ))}
                   </div>
 
-                  {/* Corporate Overview Note */}
-                  <div className="bg-gradient-to-r from-[#4d0711] to-[#200206] border border-[#691823]/30 p-6 rounded-3xl text-amber-100/90 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
-                    <div className="flex flex-col gap-1">
-                      <h3 className="font-extrabold text-amber-400 text-sm uppercase tracking-wider">Strategic Operations Control</h3>
-                      <p className="text-xs max-w-xl text-amber-100/70 leading-relaxed mt-1">
-                        Welcome, Managing Director. You have administrative override privileges. Monitor branch volumes, employee conversions, revenue margins, and approve pending operational funds.
-                      </p>
+                  {/* MAIN DASHBOARD WIDGETS (12-col grid) */}
+                  <div className="grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12 gap-4 sm:gap-6 mt-2">
+                    
+                    {/* Row 1: Funnel, Summary, Exec Status */}
+                    {/* Business Funnel */}
+                    <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 col-span-1 md:col-span-3 xl:col-span-3 flex flex-col h-full">
+                      <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Business Funnel (Today)</h3>
+                      <div className="flex flex-col w-full gap-1 mt-2 flex-1 justify-center">
+                        {funnelStages.map((stage, idx) => {
+                          const topInset = idx * 6; 
+                          const botInset = (idx + 1) * 6;
+                          return (
+                            <div key={idx} className="flex items-center w-full relative">
+                              <div className="w-[120px] xl:w-[140px] shrink-0 h-9 relative flex items-center justify-center text-white font-bold text-[10px] shadow-sm group cursor-pointer"
+                                   style={{ 
+                                     clipPath: `polygon(${topInset}% 0%, ${100 - topInset}% 0%, ${100 - botInset}% 100%, ${botInset}% 100%)`
+                                    }}
+                              >
+                                <div className={`absolute inset-0 ${stage.color} group-hover:opacity-90 transition-opacity`} />
+                                <span className="relative z-10">{stage.value}</span>
+                              </div>
+                              <div className="flex-1 ml-3 flex justify-between items-center text-[10px]">
+                                <span className="font-bold text-slate-700 leading-tight">{stage.name}</span>
+                                <span className="text-slate-500 font-extrabold">{stage.percentage}%</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button onClick={() => setActiveTab('funds')} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition-all active:scale-95">
-                        💳 View Fund Requests
-                      </button>
+
+                    {/* Today's Business Summary */}
+                    <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 col-span-1 md:col-span-3 xl:col-span-3 flex flex-col h-full">
+                      <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Today's Business Summary</h3>
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 flex-1">
+                        <div className="flex flex-col gap-3 justify-center">
+                          {businessSummary.map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-5 h-5 flex items-center justify-center rounded-md bg-slate-50 ${item.color} text-[10px]`}>{item.icon}</span>
+                                <span className="font-semibold text-slate-700 text-[10px]">{item.name}</span>
+                              </div>
+                              <span className="font-black text-slate-900">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-col gap-3 xl:border-l xl:border-slate-100 xl:pl-4 pt-3 xl:pt-0 border-t xl:border-t-0 border-slate-100 justify-center">
+                          <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Business Highlights</h4>
+                          {businessHighlights.map((item, idx) => (
+                            <div key={idx} className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold">
+                                <span className={item.color}>{item.icon}</span> {item.name}
+                              </div>
+                              <div className="font-black text-slate-900 text-xs ml-5">{item.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Live Executive Status */}
+                    <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 col-span-1 md:col-span-6 xl:col-span-6 flex flex-col h-full">
+                      <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                        <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider">Live Executive Status (Today)</h3>
+                        <button className="text-[10px] font-bold text-amber-600 hover:underline cursor-pointer">View All Executives →</button>
+                      </div>
+                      <div className="overflow-x-auto flex-1">
+                        <table className="w-full text-left text-xs min-w-[400px]">
+                          <thead>
+                            <tr className="text-slate-400 border-b border-slate-100/50">
+                              <th className="pb-2 font-semibold">Executive</th>
+                              <th className="pb-2 font-semibold">Status</th>
+                              <th className="pb-2 font-semibold">Today's Activity</th>
+                              <th className="pb-2 font-semibold text-center">Cases</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {liveExecutiveStatusList.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="py-8 text-center text-slate-400 italic">
+                                  No active Field Executives operations today.
+                                </td>
+                              </tr>
+                            ) : (
+                              liveExecutiveStatusList.map(exec => (
+                                <tr key={exec.id} className="hover:bg-slate-50 transition-colors group">
+                                  <td className="py-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-black text-[#4d0711]">{exec.avatar}</span>
+                                      <span className="font-bold text-slate-800">{exec.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2">
+                                    <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wide ${exec.statusColor}`}>
+                                      {exec.status}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 font-medium text-slate-600 text-[11px]">{exec.activity}</td>
+                                  <td className="py-2 text-center font-black text-slate-800">{exec.cases}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Row 2: Revenue & Lead Sources */}
+                    {/* Revenue Analytics */}
+                    <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 col-span-1 md:col-span-6 xl:col-span-8 flex flex-col h-full">
+                      <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                        <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider">Revenue Analytics</h3>
+                        <select className="text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none cursor-pointer">
+                          <option>This Month</option>
+                          <option>Last Month</option>
+                        </select>
+                      </div>
+                      <div className="h-[220px] w-full mt-2">
+                        {isClient && (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={revenueData.trend && revenueData.trend.length > 0 ? revenueData.trend : []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                              <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                              <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v/100000}L`} />
+                              <Tooltip 
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                formatter={(value) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Revenue']} 
+                              />
+                              <Line type="monotone" dataKey="revenue" stroke="#4d0711" strokeWidth={3} activeDot={{ r: 6, fill: '#c3902c', stroke: '#fff', strokeWidth: 2 }} dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Lead Sources */}
+                    <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 col-span-1 md:col-span-6 xl:col-span-4 flex flex-col h-full">
+                      <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Lead Sources (This Month)</h3>
+                      <div className="h-[180px] w-full relative">
+                        {isClient && leadSourcesList.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={leadSourcesList}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={50}
+                                outerRadius={80}
+                                paddingAngle={2}
+                                dataKey="value"
+                                stroke="none"
+                              >
+                                {leadSourcesList.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-xs text-slate-400 italic">No lead sources recorded</div>
+                        )}
+                        {leadSourcesList.length > 0 && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span className="text-lg font-black text-slate-800">{leads.length}</span>
+                            <span className="text-[9px] font-bold text-slate-400">Total Leads</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-col gap-1.5">
+                        {leadSourcesList.slice(0,3).map((item, i) => (
+                          <div key={i} className="flex justify-between items-center text-[10px]">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                              <span className="font-medium text-slate-600">{item.name}</span>
+                            </div>
+                            <span className="font-bold text-slate-800">{item.value} <span className="text-slate-400">({leads.length > 0 ? Math.round(item.value/leads.length*100) : 0}%)</span></span>
+                          </div>
+                        ))}
+                        <button className="text-[10px] font-bold text-amber-600 hover:underline text-center mt-1 cursor-pointer">View Full Report →</button>
+                      </div>
+                    </div>
+
+                    {/* Row 3: Exec Performance, Gold Summary, Alerts */}
+                    {/* Executive Performance */}
+                    <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 col-span-1 md:col-span-6 xl:col-span-6 flex flex-col h-full overflow-hidden">
+                      <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                        <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider">Executive Performance (This Month)</h3>
+                        <button className="text-[10px] font-bold text-amber-600 hover:underline cursor-pointer">View All</button>
+                      </div>
+                      <div className="overflow-x-auto flex-1">
+                        <table className="w-full text-left text-xs min-w-[500px]">
+                          <thead>
+                            <tr className="text-slate-400 border-b border-slate-100/50">
+                              <th className="pb-2 font-semibold">Rank</th>
+                              <th className="pb-2 font-semibold">Executive</th>
+                              <th className="pb-2 font-semibold text-center">Assigned Leads</th>
+                              <th className="pb-2 font-semibold text-center">Completed Cases</th>
+                              <th className="pb-2 font-semibold text-right">Gold (g)</th>
+                              <th className="pb-2 font-semibold text-right">Revenue (₹)</th>
+                              <th className="pb-2 font-semibold text-right">Conv. Rate</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {sortedExecPerformanceList.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} className="py-8 text-center text-slate-400 italic">
+                                  No performance records available.
+                                </td>
+                              </tr>
+                            ) : (
+                              sortedExecPerformanceList.map((exec, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                                  <td className="py-2.5">
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-amber-100 text-amber-600' : idx === 1 ? 'bg-slate-200 text-slate-600' : idx === 2 ? 'bg-orange-100 text-orange-600' : 'bg-slate-50 text-slate-400'}`}>
+                                      {idx + 1}
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 font-bold text-slate-800">{exec.name}</td>
+                                  <td className="py-2.5 text-center font-medium text-slate-600">{exec.assignedLeads}</td>
+                                  <td className="py-2.5 text-center font-medium text-slate-600">{exec.completedCases}</td>
+                                  <td className="py-2.5 text-right font-medium text-slate-700">{Number(exec.goldCollected || 0).toFixed(2)}</td>
+                                  <td className="py-2.5 text-right font-bold text-slate-800">₹{Number(exec.amountHandled || 0).toLocaleString('en-IN')}</td>
+                                  <td className={`py-2.5 text-right font-black ${exec.completionRate >= 50 ? 'text-emerald-600' : exec.completionRate >= 30 ? 'text-amber-500' : 'text-rose-500'}`}>
+                                    {exec.completionRate}%
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Gold Collection Summary */}
+                    <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 col-span-1 md:col-span-3 xl:col-span-3 flex flex-col h-full">
+                      <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Gold Collection Summary</h3>
+                      <select className="w-full text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none mb-4 cursor-pointer">
+                        <option>This Month</option>
+                        <option>Last Month</option>
+                        <option>This Year</option>
+                      </select>
+                      <div className="flex flex-col gap-3 flex-1 justify-center">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500 font-medium">Today</span>
+                          <span className="font-black text-amber-600">🌟 {(goldData.today || 0).toFixed(2)} g</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500 font-medium">This Month</span>
+                          <span className="font-bold text-slate-800">{(goldData.month || 0).toFixed(2)} g</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500 font-medium">All Time Total</span>
+                          <span className="font-bold text-slate-800">{(goldData.total || 0).toFixed(2)} g</span>
+                        </div>
+                      </div>
+                      <button className="text-[10px] font-bold text-amber-600 hover:underline text-center mt-4 cursor-pointer">View Full Report →</button>
+                    </div>
+
+                    {/* Alerts & Notifications */}
+                    <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 col-span-1 md:col-span-3 xl:col-span-3 flex flex-col h-full">
+                      <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                        <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider">Alerts & Notifications</h3>
+                        <button className="text-[10px] font-bold text-amber-600 hover:underline cursor-pointer">View All</button>
+                      </div>
+                      <div className="flex flex-col gap-2.5 flex-1">
+                        {dynamicAlertsList.map(alert => (
+                          <div key={alert.id} className={`flex justify-between items-center text-[10px] p-1.5 rounded-lg transition-colors group ${alert.bg}`}>
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 flex items-center justify-center rounded-md font-bold">{alert.icon}</span>
+                              <span className={`font-semibold ${alert.color}`}>{alert.text}</span>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full font-black ${alert.color}`}>{alert.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               )}
