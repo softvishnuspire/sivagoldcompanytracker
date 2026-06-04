@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  PhoneCall, 
   PlusCircle, 
   ListTodo, 
   FileText, 
@@ -23,7 +22,7 @@ import { Lead, LeadStatus, DashboardStats, Followup } from './types';
 import StatsOverview from './components/StatsOverview';
 import LeadForm from './components/LeadForm';
 import LeadList from './components/LeadList';
-import FollowupList from './components/FollowupList';
+
 import ReportsView from './components/ReportsView';
 import PendingFollowupsList from './components/PendingFollowupsList';
 import DocumentManager from '@/components/DocumentManager';
@@ -32,7 +31,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function TelecallerDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'pending-followups' | 'reports' | 'document-manager'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'pending-followups' | 'reports' | 'document-manager'>('dashboard');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -125,6 +124,9 @@ export default function TelecallerDashboard() {
       executiveId: db.executive_id,
       createdAt: db.created_at,
       updatedAt: db.updated_at,
+      customerInterest: db.customer_interest,
+      priceCommunicated: db.price_communicated,
+      remarks: db.remarks,
       documents,
       followups,
       reverificationRemarks
@@ -202,10 +204,16 @@ export default function TelecallerDashboard() {
   const getStats = (): DashboardStats => {
     const newLeads = leads.filter(l => l.status === 'CUSTOMER_DETAILS_CREATED').length;
     
-    const pendingFollowups = leads.filter(l => 
-      l.status === 'FOLLOWUP_IN_PROGRESS' || 
-      (l.followups && l.followups.some(f => f.status === 'PENDING'))
-    ).length;
+    const pendingFollowups = leads.filter(lead => {
+      const isFollowup = lead.status === 'FOLLOWUP_IN_PROGRESS';
+      const isMissingDetails = 
+        lead.goldWeight === 0 || 
+        !lead.bankName || 
+        lead.loanAmount === 0 ||
+        !lead.documents || 
+        lead.documents.length === 0;
+      return isFollowup && isMissingDetails;
+    }).length;
 
     const qualifiedLeads = leads.filter(l => l.status === 'SENT_TO_RM').length;
     const rejectedLeads = leads.filter(l => l.status === 'RM_REJECTED').length;
@@ -278,7 +286,13 @@ export default function TelecallerDashboard() {
     }
   };
 
-  const handleUpdateLeadStatus = async (leadId: string, status: LeadStatus, remarks?: string) => {
+  const handleUpdateLeadStatus = async (
+    leadId: string, 
+    status: LeadStatus, 
+    remarks?: string,
+    customerInterest?: string,
+    priceCommunicated?: boolean
+  ) => {
     try {
       const leadToUpdate = leads.find(l => l.id === leadId);
       if (!leadToUpdate) return;
@@ -298,7 +312,10 @@ export default function TelecallerDashboard() {
           branchName: leadToUpdate.branchName,
           loanAmount: leadToUpdate.loanAmount,
           loanAccountNumber: leadToUpdate.loanAccountNumber,
-          status: status
+          status: status,
+          remarks: remarks !== undefined ? remarks : leadToUpdate.remarks,
+          customerInterest: customerInterest !== undefined ? customerInterest : leadToUpdate.customerInterest,
+          priceCommunicated: priceCommunicated !== undefined ? priceCommunicated : leadToUpdate.priceCommunicated
         })
       });
 
@@ -373,7 +390,6 @@ export default function TelecallerDashboard() {
     { id: 'leads-list' as const, label: 'Lead Management', icon: ListTodo },
     { id: 'add-lead' as const, label: 'Add Lead', icon: PlusCircle },
     { id: 'pending-followups' as const, label: 'Pending Followups', icon: Clock },
-    { id: 'follow-ups' as const, label: 'Follow-ups', icon: PhoneCall },
     { id: 'document-manager' as const, label: 'Document Manager', icon: FileText },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 }
   ];
@@ -488,7 +504,7 @@ export default function TelecallerDashboard() {
         )}
 
         {/* Main Content Workspace */}
-        <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6 pb-24 lg:pb-8">
+        <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6 pb-6 sm:pb-8">
           {/* Header Title bar */}
           <div className="hidden lg:flex items-center justify-between pb-4 border-b border-slate-200">
             <div>
@@ -539,12 +555,21 @@ export default function TelecallerDashboard() {
                   {/* Performance Summary */}
                   <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col justify-between gap-6">
                     <div>
-                      <h3 className="text-base font-bold text-slate-800 mb-1">Outbound Calling Queue</h3>
-                      <p className="text-xs text-slate-500">Ready numbers selected according to scheduled callback parameters.</p>
+                      <h3 className="text-base font-bold text-slate-800 mb-1">Incomplete Leads Queue</h3>
+                      <p className="text-xs text-slate-500">Leads requiring completion of gold weight, bank details, or documents.</p>
                     </div>
 
                     <div className="space-y-3.5">
-                      {leads.filter(l => ['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(l.status)).slice(0, 3).map((lead, index) => (
+                      {leads.filter(lead => {
+                        const isFollowup = lead.status === 'FOLLOWUP_IN_PROGRESS';
+                        const isMissingDetails = 
+                          lead.goldWeight === 0 || 
+                          !lead.bankName || 
+                          lead.loanAmount === 0 ||
+                          !lead.documents || 
+                          lead.documents.length === 0;
+                        return isFollowup && isMissingDetails;
+                      }).slice(0, 3).map((lead, index) => (
                         <div key={index} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 flex items-center justify-center font-bold text-xs">
@@ -557,14 +582,23 @@ export default function TelecallerDashboard() {
                           </div>
 
                           <button
-                            onClick={() => triggerCallSimulationFromFollowup(lead)}
-                            className="flex items-center gap-1 py-1.5 px-3 rounded-lg bg-[#c3902c] hover:bg-amber-600 text-white text-[10px] font-bold transition-all cursor-pointer shadow-sm"
+                            onClick={() => handleEditLeadTrigger(lead)}
+                            className="flex items-center gap-1.5 py-1.5 px-3.5 rounded-lg bg-[#c3902c] hover:bg-amber-600 text-white text-[10px] font-bold transition-all cursor-pointer shadow-sm"
                           >
-                            <Phone size={11} /> Dial Client
+                            Complete Details
                           </button>
                         </div>
                       ))}
-                      {leads.filter(l => ['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(l.status)).length === 0 && (
+                      {leads.filter(lead => {
+                        const isFollowup = lead.status === 'FOLLOWUP_IN_PROGRESS';
+                        const isMissingDetails = 
+                          lead.goldWeight === 0 || 
+                          !lead.bankName || 
+                          lead.loanAmount === 0 ||
+                          !lead.documents || 
+                          lead.documents.length === 0;
+                        return isFollowup && isMissingDetails;
+                      }).length === 0 && (
                         <div className="py-8 text-center text-xs text-slate-400 uppercase tracking-widest font-medium">
                           Queue is currently empty.
                         </div>
@@ -572,10 +606,10 @@ export default function TelecallerDashboard() {
                     </div>
 
                     <button
-                      onClick={() => setActiveTab('leads-list')}
+                      onClick={() => setActiveTab('pending-followups')}
                       className="w-full text-center py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors border border-dashed border-slate-200 hover:border-slate-400 rounded-xl bg-white"
                     >
-                      View All Active Leads List
+                      View All Pending Follow-ups
                     </button>
                   </div>
 
@@ -637,15 +671,7 @@ export default function TelecallerDashboard() {
               </div>
             )}
 
-            {activeTab === 'follow-ups' && (
-              <div className="animate-fadeIn">
-                <FollowupList
-                  leads={leads}
-                  onCompleteFollowup={handleCompleteFollowup}
-                  onSimulateCall={triggerCallSimulationFromFollowup}
-                />
-              </div>
-            )}
+
 
             {activeTab === 'pending-followups' && (
               <div className="animate-fadeIn">
@@ -671,31 +697,6 @@ export default function TelecallerDashboard() {
           </div>
         </main>
       </div>
-
-      {/* Mobile Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#4d0711] border-t border-[#691823]/25 p-2 flex items-center justify-around z-40 backdrop-blur-md bg-opacity-95 shadow-2xl">
-        {navigationItems.map(item => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                if (item.id !== 'add-lead') {
-                  setEditingLead(null);
-                }
-              }}
-              className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all duration-300 ${
-                isActive ? 'text-amber-400' : 'text-amber-100/60 hover:text-amber-300'
-              }`}
-            >
-              <Icon size={18} />
-              <span className="text-[9px] font-bold tracking-tight">{item.label.split(' ')[0]}</span>
-            </button>
-          );
-        })}
-      </nav>
     </div>
   );
 }

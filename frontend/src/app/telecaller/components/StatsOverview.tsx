@@ -10,7 +10,7 @@ import { DashboardStats } from '../types';
 
 interface StatsOverviewProps {
   stats: DashboardStats;
-  onSelectTab: (tab: 'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'reports') => void;
+  onSelectTab: (tab: 'dashboard' | 'add-lead' | 'leads-list' | 'pending-followups' | 'reports') => void;
 }
 
 export default function StatsOverview({ stats, onSelectTab }: StatsOverviewProps) {
@@ -28,8 +28,8 @@ export default function StatsOverview({ stats, onSelectTab }: StatsOverviewProps
       value: stats.pendingFollowups,
       icon: CalendarClock,
       color: 'border-sky-200 text-sky-600 bg-sky-50/60',
-      actionTab: 'follow-ups' as const,
-      description: 'Scheduled callbacks'
+      actionTab: 'pending-followups' as const,
+      description: 'Incomplete lead details'
     },
     {
       title: 'Qualified Leads',

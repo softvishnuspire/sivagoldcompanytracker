@@ -775,7 +775,10 @@ app.put('/api/telecaller/leads/:id', authenticateToken, requireRole(['TELECALLER
       loanAmount,
       loanAccountNumber,
       status,
-      documents
+      documents,
+      customerInterest,
+      priceCommunicated,
+      remarks
     } = req.body;
 
     // Verify ownership
@@ -793,24 +796,30 @@ app.put('/api/telecaller/leads/:id', authenticateToken, requireRole(['TELECALLER
       return res.status(403).json({ error: 'Forbidden: You do not own this lead.' });
     }
 
+    const updatePayload = {
+      customer_name: customerName,
+      mobile: mobile,
+      alternate_mobile: alternateMobile,
+      address: address,
+      district: district,
+      gold_weight: goldWeight,
+      gold_type: goldType,
+      estimated_value: estimatedValue,
+      bank_name: bankName,
+      branch_name: branchName,
+      loan_amount: loanAmount,
+      loan_account_number: loanAccountNumber,
+      current_status: status || leadCheck.current_status,
+      updated_at: new Date().toISOString()
+    };
+
+    if (customerInterest !== undefined) updatePayload.customer_interest = customerInterest;
+    if (priceCommunicated !== undefined) updatePayload.price_communicated = priceCommunicated;
+    if (remarks !== undefined) updatePayload.remarks = remarks;
+
     const { data: lead, error: updateError } = await supabase
       .from('leads')
-      .update({
-        customer_name: customerName,
-        mobile: mobile,
-        alternate_mobile: alternateMobile,
-        address: address,
-        district: district,
-        gold_weight: goldWeight,
-        gold_type: goldType,
-        estimated_value: estimatedValue,
-        bank_name: bankName,
-        branch_name: branchName,
-        loan_amount: loanAmount,
-        loan_account_number: loanAccountNumber,
-        current_status: status || leadCheck.current_status,
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();
@@ -851,7 +860,7 @@ app.put('/api/telecaller/leads/:id', authenticateToken, requireRole(['TELECALLER
     await supabase.from('lead_timeline').insert({
       lead_id: id,
       status: status || leadCheck.current_status,
-      remarks: 'Lead details modified by Telecaller',
+      remarks: status === 'SENT_TO_RM' ? 'Sent to RM for verification' : 'Lead details modified by Telecaller',
       updated_by: req.user.id
     });
 

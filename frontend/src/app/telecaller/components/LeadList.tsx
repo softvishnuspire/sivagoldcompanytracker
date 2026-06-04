@@ -23,7 +23,13 @@ import { Lead, LeadStatus } from '../types';
 interface LeadListProps {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
-  onUpdateStatus: (leadId: string, status: LeadStatus, remarks?: string) => void;
+  onUpdateStatus: (
+    leadId: string, 
+    status: LeadStatus, 
+    remarks?: string,
+    customerInterest?: string,
+    priceCommunicated?: boolean
+  ) => void;
   onAddFollowup: (leadId: string, date: string, remarks: string) => void;
   onDelete: (leadId: string) => void;
 }
@@ -40,6 +46,44 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup,
   const [showCallOutcome, setShowCallOutcome] = useState(false);
   const [followupDate, setFollowupDate] = useState('');
   const [followupRemarks, setFollowupRemarks] = useState('');
+
+  // Lead Qualification modal states
+  const [qualifyingLead, setQualifyingLead] = useState<Lead | null>(null);
+  const [isSellingInterest, setIsSellingInterest] = useState<string>(''); // 'Yes' or 'No'
+  const [isPriceCommunicated, setIsPriceCommunicated] = useState<string>(''); // 'Yes' or 'No'
+  const [qualificationRemarks, setQualificationRemarks] = useState<string>('');
+  const [qualifyValidationError, setQualifyValidationError] = useState<string>('');
+
+  const triggerQualifyLead = (lead: Lead) => {
+    setQualifyingLead(lead);
+    setIsSellingInterest('');
+    setIsPriceCommunicated('');
+    setQualificationRemarks(lead.remarks || '');
+    setQualifyValidationError('');
+  };
+
+  const submitQualification = () => {
+    if (!qualifyingLead) return;
+
+    if (!isSellingInterest) {
+      setQualifyValidationError('Please specify if the customer is interested in selling.');
+      return;
+    }
+
+    onUpdateStatus(
+      qualifyingLead.id,
+      'SENT_TO_RM',
+      qualificationRemarks || 'Sent to RM for verification',
+      isSellingInterest,
+      isPriceCommunicated === 'Yes'
+    );
+
+    setQualifyingLead(null);
+    setIsSellingInterest('');
+    setIsPriceCommunicated('');
+    setQualificationRemarks('');
+    setQualifyValidationError('');
+  };
 
   // Search and filter logic
   const filteredLeads = leads.filter(lead => {
@@ -248,18 +292,10 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup,
                   </td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex items-center justify-end gap-2.5">
-                      {['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(lead.status) && (
-                        <button
-                          onClick={() => startCall(lead)}
-                          className="p-2 rounded-xl bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 transition-colors border border-amber-500/20 cursor-pointer"
-                          title="Simulate Call"
-                        >
-                          <Phone size={15} />
-                        </button>
-                      )}
+
                       {lead.status === 'CUSTOMER_DETAILS_CREATED' && (
                         <button
-                          onClick={() => onUpdateStatus(lead.id, 'SENT_TO_RM', 'Sent to RM for verification')}
+                          onClick={() => triggerQualifyLead(lead)}
                           className="p-2 rounded-xl bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors border border-emerald-500/20 cursor-pointer"
                           title="Send to RM"
                         >
@@ -354,17 +390,10 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup,
                 </span>
                 
                 <div className="flex gap-2">
-                  {['CUSTOMER_DETAILS_CREATED', 'FOLLOWUP_IN_PROGRESS'].includes(lead.status) && (
-                    <button
-                      onClick={() => startCall(lead)}
-                      className="flex items-center gap-1 py-1.5 px-3 rounded-lg bg-amber-500/10 text-amber-700 border border-amber-500/20 text-xs font-semibold hover:bg-amber-500/20 transition-all cursor-pointer"
-                    >
-                      <Phone size={13} /> Call
-                    </button>
-                  )}
+
                   {lead.status === 'CUSTOMER_DETAILS_CREATED' && (
                     <button
-                      onClick={() => onUpdateStatus(lead.id, 'SENT_TO_RM', 'Sent to RM for verification')}
+                      onClick={() => triggerQualifyLead(lead)}
                       className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-xs font-semibold hover:bg-emerald-500/20 transition-all cursor-pointer"
                     >
                       <Send size={13} /> Send to RM
@@ -508,6 +537,137 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup,
                 </button>
               </div>
             )}
+
+          </div>
+        </div>
+      )}
+
+      {/* Lead Qualification Modal */}
+      {qualifyingLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#200206]/85 backdrop-blur-xs animate-fadeIn">
+          <div className="relative w-full max-w-md bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 shadow-2xl text-slate-805 animate-scaleUp">
+            
+            {/* Header */}
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-[#c3902c] flex items-center justify-center">
+                📋
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-black text-slate-900 leading-snug">Lead Qualification</h3>
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                  Lead: {qualifyingLead.leadNumber}
+                </p>
+              </div>
+            </div>
+
+            {/* Form */}
+            <div className="space-y-5 text-left">
+              {/* Interested in Selling */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Interested in Selling? <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex gap-6 mt-1">
+                  <label className="flex items-center gap-2.5 text-xs text-slate-705 cursor-pointer select-none font-semibold">
+                    <input
+                      type="radio"
+                      name="sellingInterest"
+                      value="Yes"
+                      checked={isSellingInterest === 'Yes'}
+                      onChange={() => {
+                        setIsSellingInterest('Yes');
+                        setQualifyValidationError('');
+                      }}
+                      className="w-4 h-4 text-amber-500 border-slate-300 focus:ring-amber-500/30 accent-amber-600"
+                    />
+                    Yes
+                  </label>
+                  <label className="flex items-center gap-2.5 text-xs text-slate-705 cursor-pointer select-none font-semibold">
+                    <input
+                      type="radio"
+                      name="sellingInterest"
+                      value="No"
+                      checked={isSellingInterest === 'No'}
+                      onChange={() => {
+                        setIsSellingInterest('No');
+                        setQualifyValidationError('');
+                      }}
+                      className="w-4 h-4 text-amber-500 border-slate-300 focus:ring-amber-500/30 accent-amber-600"
+                    />
+                    No
+                  </label>
+                </div>
+              </div>
+
+              {/* Price Communicated */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Price Communicated?
+                </label>
+                <div className="flex gap-6 mt-1">
+                  <label className="flex items-center gap-2.5 text-xs text-slate-705 cursor-pointer select-none font-semibold">
+                    <input
+                      type="radio"
+                      name="priceCommunicated"
+                      value="Yes"
+                      checked={isPriceCommunicated === 'Yes'}
+                      onChange={() => setIsPriceCommunicated('Yes')}
+                      className="w-4 h-4 text-amber-500 border-slate-300 focus:ring-amber-500/30 accent-amber-600"
+                    />
+                    Yes
+                  </label>
+                  <label className="flex items-center gap-2.5 text-xs text-slate-705 cursor-pointer select-none font-semibold">
+                    <input
+                      type="radio"
+                      name="priceCommunicated"
+                      value="No"
+                      checked={isPriceCommunicated === 'No'}
+                      onChange={() => setIsPriceCommunicated('No')}
+                      className="w-4 h-4 text-amber-500 border-slate-300 focus:ring-amber-500/30 accent-amber-600"
+                    />
+                    No
+                  </label>
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Remarks / Notes
+                </label>
+                <textarea
+                  value={qualificationRemarks}
+                  onChange={(e) => setQualificationRemarks(e.target.value)}
+                  placeholder="Enter notes about the lead"
+                  rows={4}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-xs text-slate-800 outline-none focus:border-amber-400 focus:bg-white focus:ring-1 focus:ring-amber-500/10 placeholder-slate-400/80 resize-none transition-all"
+                />
+              </div>
+
+              {qualifyValidationError && (
+                <p className="text-[11px] font-bold text-rose-500 bg-rose-50 border border-rose-100 py-2 px-3.5 rounded-xl">
+                  ⚠️ {qualifyValidationError}
+                </p>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-slate-100 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setQualifyingLead(null)}
+                  className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-550 hover:text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitQualification}
+                  className="flex-1 py-2.5 bg-[#c3902c] hover:bg-amber-600 text-white font-bold text-xs rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  Submit to RM
+                </button>
+              </div>
+            </div>
 
           </div>
         </div>

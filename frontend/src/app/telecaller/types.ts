@@ -70,6 +70,9 @@ export interface Lead {
   documents?: Document[];
   followups?: Followup[];
   reverificationRemarks?: string;
+  customerInterest?: string;
+  priceCommunicated?: boolean;
+  remarks?: string;
 }
 
 export interface DashboardStats {
@@ -163,6 +166,7 @@ export interface DbLead {
   customer_interest?: string;
   expected_price?: number;
   remarks?: string;
+  price_communicated?: boolean;
   created_at: string;
   updated_at: string;
   

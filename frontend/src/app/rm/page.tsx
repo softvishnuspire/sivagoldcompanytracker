@@ -32,6 +32,7 @@ interface Lead {
   customer_interest?: string;
   expected_price?: number;
   remarks?: string;
+  price_communicated?: boolean;
   created_at: string;
   updated_at: string;
   telecaller?: { name: string };
@@ -788,6 +789,41 @@ export default function RMDashboard() {
                         </div>
                         <div className="col-span-2">
                           <span className="text-slate-400 block mb-0.5">Remarks</span>
+                          <span className="font-bold text-slate-700 italic">"{leadDetail.lead.remarks || 'No remarks provided'}"</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lead Qualification info */}
+                    <div className="bg-white border border-slate-200/80 shadow-sm rounded-2xl p-5 flex flex-col gap-3">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Lead Qualification</h3>
+                      <div className="grid grid-cols-2 gap-y-3 text-xs">
+                        <div>
+                          <span className="text-slate-400 block mb-0.5">Interested in Selling?</span>
+                          <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wide inline-block ${
+                            leadDetail.lead.customer_interest === 'Yes' 
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                              : leadDetail.lead.customer_interest === 'No' 
+                              ? 'bg-rose-100 text-rose-805 border border-rose-200' 
+                              : 'bg-slate-100 text-slate-800 border border-slate-200'
+                          }`}>
+                            {leadDetail.lead.customer_interest || 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block mb-0.5">Price Communicated?</span>
+                          <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wide inline-block ${
+                            leadDetail.lead.price_communicated === true 
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                              : leadDetail.lead.price_communicated === false 
+                              ? 'bg-rose-100 text-rose-805 border border-rose-200' 
+                              : 'bg-slate-100 text-slate-800 border border-slate-200'
+                          }`}>
+                            {leadDetail.lead.price_communicated === true ? 'Yes' : leadDetail.lead.price_communicated === false ? 'No' : 'N/A'}
+                          </span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-slate-400 block mb-0.5">Remarks / Notes</span>
                           <span className="font-bold text-slate-700 italic">"{leadDetail.lead.remarks || 'No remarks provided'}"</span>
                         </div>
                       </div>

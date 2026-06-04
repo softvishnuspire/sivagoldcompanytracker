@@ -60,6 +60,7 @@ CREATE TABLE public.leads (
   customer_interest text,
   expected_price numeric,
   remarks text,
+  price_communicated boolean,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT leads_pkey PRIMARY KEY (id),

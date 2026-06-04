@@ -176,3 +176,12 @@ graph TD
 - **Unified Document Manager**: Built a unified, shared `DocumentManager` component and integrated it into all four dashboards (Telecaller, RM, MD, and Field Executive). Configured a global `/api/documents/leads` backend endpoint to pre-fetch nested files, gold collection images, and payment proofs along with audit tracking attributes (uploader name and role). Removed separate Documents and Gallery menu links from the Executive sidebar layout.
 - **Executive Lead Details Page Syntax Fix**: Resolved a Next.js build error in `frontend/src/app/executive/lead/[id]/page.tsx` caused by a stray closing `</div>` tag at line 1157 which prematurely closed the right-column layout wrapper, leaving the Document Preview Modal outside the root element.
 - **Report Export Authentication Fix**: Fixed access denied errors during MD report downloads (PDF/Excel) by updating the JWT `authenticateToken` middleware to check both the `Authorization` header and the URL query parameter (`token`). This allows browser-directed file download requests to authenticate successfully.
+- **Telecaller Lead Management Call Button Removal**: Removed the simulated call option button from the Lead Management list (both desktop table layout and mobile card layout) inside the Telecaller module.
+- **Telecaller Follow-ups Feature Deletion**: Completely removed the Follow-ups simulated call tracking tab, navigation options, and sidebar item in the Telecaller portal. Reconfigured the "Pending Follow-ups" stats card and the Dashboard calling queue widget into a "Pending Completion/Incomplete Leads Queue" that displays and links directly to leads needing detail updates (via the Pending Followups page or edit form).
+- **Telecaller Mobile Bottom Menu Removal**: Removed the mobile bottom navigation menu from the Telecaller dashboard to clean up the mobile viewport design, and adjusted the main workspace bottom padding on mobile.
+- **Lead Qualification Flow**: Added a pop-up modal to capture "Lead Qualification" details (Interested in Selling, Price Communicated, and Remarks/Notes) when a Telecaller submits a lead to RM (status `SENT_TO_RM`). Updated the backend API endpoint (`PUT /api/telecaller/leads/:id`) to persist these fields (`customer_interest`, `price_communicated`, `remarks`), and integrated a separate, styled "Lead Qualification" card into the Relationship Manager (RM) details verification page (`rm/page.tsx`).
+
+
+
+
+

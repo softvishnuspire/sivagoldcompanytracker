@@ -142,6 +142,7 @@ CREATE TABLE IF NOT EXISTS leads (
     customer_interest TEXT,
     expected_price NUMERIC(12,2),
     remarks TEXT,
+    price_communicated BOOLEAN,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
