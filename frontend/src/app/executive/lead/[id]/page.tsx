@@ -429,7 +429,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-450">Loan Account No.</span>
-                  <span className="text-slate-800 truncate max-w-[140px] font-bold">{lead.loan_account_number || 'N/A'}</span>
+                  <span className="text-slate-800 break-all font-bold">{lead.loan_account_number || 'N/A'}</span>
                 </div>
               </div>
             </div>

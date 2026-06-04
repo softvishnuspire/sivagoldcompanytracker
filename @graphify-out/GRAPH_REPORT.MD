@@ -195,6 +195,8 @@ graph TD
   - Linked the 'Executives' register view to render real DB status and database employee codes rather than indices and hardcoded 'Active' labels. Updated the backend RM executives endpoint to fetch `employee_code`.
   - Upgraded the 'Lead Sources' tab to dynamically compute lead volume counts per source from database leads rather than hardcoding static mock listings. Added a 'Total Leads' count column to the view.
 - **MD TypeScript Compiler Fix**: Resolved an implicit `any` type compilation error (`Parameter 'd' implicitly has an 'any' type`) in the documents search callback inside [md/page.tsx](file:///c:/sivagoldcompanytracker/frontend/src/app/md/page.tsx#L1070) by explicitly annotating the parameter `d` with the type `any` (i.e. `(d: any)`).
+- **MD Fund Approval Loan Amount Sync**: Fixed a bug where when the MD accepted a fund request and modified the requested amount, the new approved amount was not saved in the `leads.loan_amount` column. Updated the MD fund approval endpoint (`POST /api/md/fund-approval`) and the executive status update endpoint (`POST /api/executive/update-status`) to persist the approved fund amount to `leads.loan_amount` so the Field Executive dashboard receives and pre-fills the correct approved value.
+
 
 
 

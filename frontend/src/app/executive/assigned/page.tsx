@@ -100,7 +100,7 @@ export default function AssignedLeadsPage() {
               <tbody className="divide-y divide-slate-100 text-sm">
                 {leads.map((lead) => (
                   <tr key={lead.id} className="hover:bg-slate-50/60 transition-colors border-b border-slate-100">
-                    <td className="px-6 py-4 font-mono text-slate-600 text-xs truncate max-w-[120px]">{lead.lead_number || lead.id.slice(0, 8)}</td>
+                    <td className="px-6 py-4 font-mono text-slate-600 text-xs whitespace-nowrap">{lead.lead_number || lead.id.slice(0, 8)}</td>
                     <td className="px-6 py-4 font-bold text-slate-800">{lead.customer_name}</td>
                     <td className="px-6 py-4 font-mono text-slate-500 text-xs">{lead.mobile}</td>
                     <td className="px-6 py-4 text-slate-500">{lead.district || lead.address || 'N/A'}</td>

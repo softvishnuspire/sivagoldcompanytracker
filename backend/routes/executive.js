@@ -324,6 +324,7 @@ router.post('/update-status', async (req, res) => {
     await verifyAndAdvanceStatus(leadId, lead.current_status, targetStatus, userId);
 
     // If advancing to MD_FUNDS_APPROVED, ensure a fund request exists and is approved (for simulation/override)
+    let approvedAmount = null;
     if (normalizeStatus(targetStatus) === 'MD_FUNDS_APPROVED') {
       const { data: pendingReq } = await supabase
         .from('fund_requests')
@@ -333,17 +334,19 @@ router.post('/update-status', async (req, res) => {
         .maybeSingle();
 
       if (pendingReq) {
+        approvedAmount = pendingReq.requested_amount;
         await supabase
           .from('fund_requests')
           .update({
             status: 'APPROVED',
-            approved_amount: pendingReq.requested_amount,
+            approved_amount: approvedAmount,
             approved_by: userId,
             approved_at: new Date()
           })
           .eq('id', pendingReq.id);
       } else {
         const mockAmount = lead.loan_amount ? Number(lead.loan_amount) : 50000;
+        approvedAmount = mockAmount;
         await supabase
           .from('fund_requests')
           .insert([{
@@ -358,9 +361,14 @@ router.post('/update-status', async (req, res) => {
       }
     }
 
+    const leadUpdates = { current_status: targetStatus, updated_at: new Date() };
+    if (approvedAmount !== null) {
+      leadUpdates.loan_amount = Number(approvedAmount);
+    }
+
     const { error: updateErr } = await supabase
       .from('leads')
-      .update({ current_status: targetStatus, updated_at: new Date() })
+      .update(leadUpdates)
       .eq('id', leadId);
 
     if (updateErr) throw updateErr;

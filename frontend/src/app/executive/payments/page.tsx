@@ -136,7 +136,7 @@ export default function PaymentsPage() {
               <tbody className="divide-y divide-slate-100 text-sm">
                 {paymentList.map((pay, index) => (
                   <tr key={index} className="hover:bg-slate-50/60 transition-colors border-b border-slate-100">
-                    <td className="px-6 py-4 font-mono text-slate-600 text-xs truncate max-w-[120px]">{pay.leadNumber || pay.leadId.slice(0, 8)}</td>
+                    <td className="px-6 py-4 font-mono text-slate-600 text-xs whitespace-nowrap">{pay.leadNumber || pay.leadId.slice(0, 8)}</td>
                     <td className="px-6 py-4 font-bold text-slate-800">{pay.customerName}</td>
                     <td className="px-6 py-4 font-mono text-slate-600 text-xs">₹{pay.loanAmount.toLocaleString('en-IN')}</td>
                     <td className="px-6 py-4 font-mono text-slate-600 text-xs">₹{pay.balanceAmount.toLocaleString('en-IN')}</td>
