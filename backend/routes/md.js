@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const { supabase } = require('../db/supabase');
@@ -645,6 +646,166 @@ router.get('/timeline', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// 11.5 POST /api/md/branch
+router.post('/branch', async (req, res) => {
+  try {
+    const { branch_name, city, state, address } = req.body;
+    if (!branch_name) {
+      return res.status(400).json({ error: 'branch_name is required' });
+    }
+    const { data, error } = await supabase
+      .from('branches')
+      .insert([{ branch_name, city, state, address }])
+      .select();
+    
+    if (error) throw error;
+    res.json({ success: true, branch: data[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+// 12. GET /api/md/branches-list
+router.get('/branches-list', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('branches')
+      .select('id, branch_name')
+      .order('branch_name', { ascending: true });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 13. GET /api/md/employees
+router.get('/employees', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select(`
+        id,
+        name,
+        email,
+        mobile,
+        role,
+        status,
+        branch_id,
+        created_at,
+        branches:branch_id ( branch_name )
+      `)
+      .in('role', ['TELECALLER', 'RM', 'EXECUTIVE'])
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 14. POST /api/md/employee
+router.post('/employee', async (req, res) => {
+  try {
+    const { branch_id, name, role, mobile, email, password } = req.body;
+
+    if (!name || !role || !mobile || !email || !password) {
+      return res.status(400).json({ error: 'All fields including password are required' });
+    }
+
+    // Check if email or mobile already exists
+    const { data: existingUser, error: checkErr } = await supabase
+      .from('users')
+      .select('id')
+      .or(`email.eq.${email.toLowerCase()},mobile.eq.${mobile}`);
+
+    if (checkErr) throw checkErr;
+    if (existingUser && existingUser.length > 0) {
+      return res.status(400).json({ error: 'Email or Mobile number already in use.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(password, salt);
+
+    const rolePrefix = role.substring(0, 2).toUpperCase();
+    const uniqueId = Math.floor(1000 + Math.random() * 9000);
+    const employee_code = `${rolePrefix}${uniqueId}`;
+
+    const { data, error } = await supabase
+      .from('users')
+      .insert([{
+        employee_code,
+        branch_id: branch_id || null,
+        name,
+        role: role.toUpperCase(),
+        mobile,
+        email: email.toLowerCase(),
+        password_hash,
+        status: 'active'
+      }])
+      .select('id, employee_code, name, email, mobile, role, status, branch_id');
+
+    if (error) throw error;
+    res.json({ success: true, employee: data[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 15. PUT /api/md/employee/:id
+router.put('/employee/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { branch_id, name, role, mobile, email, password } = req.body;
+
+    const updates = {
+      name,
+      role: role ? role.toUpperCase() : undefined,
+      mobile,
+      email: email ? email.toLowerCase() : undefined,
+      branch_id: branch_id || null,
+      updated_at: new Date().toISOString()
+    };
+
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      updates.password_hash = await bcrypt.hash(password, salt);
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', id)
+      .select('id, name, email, mobile, role, status, branch_id');
+
+    if (error) throw error;
+    res.json({ success: true, employee: data[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 16. DELETE /api/md/employee/:id (Soft delete/Deactivate)
+router.delete('/employee/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Soft delete by setting status to 'inactive'
+    const { data, error } = await supabase
+      .from('users')
+      .update({ status: 'inactive', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    res.json({ success: true, message: 'Employee deactivated successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // Helper: Query core tables to compile standard list items for reports
 async function getReportData(type) {

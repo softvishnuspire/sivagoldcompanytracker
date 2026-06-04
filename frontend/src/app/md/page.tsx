@@ -165,6 +165,16 @@ export default function MDDashboard() {
   const [fundRemarksInput, setFundRemarksInput] = useState<string>('');
   const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('Discrepancy in documentation');
 
+  // Branch forms
+  const [isAddBranchModalOpen, setIsAddBranchModalOpen] = useState<boolean>(false);
+  const [newBranchData, setNewBranchData] = useState({ branch_name: '', city: '', state: '', address: '' });
+
+  // Employee Management
+  const [employeesList, setEmployeesList] = useState<any[]>([]);
+  const [branchesList, setBranchesList] = useState<any[]>([]);
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
+  const [employeeForm, setEmployeeForm] = useState({ id: '', branch_id: '', name: '', role: 'TELECALLER', mobile: '', email: '', password: '' });
+
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
   const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
@@ -386,6 +396,9 @@ export default function MDDashboard() {
       fetchGoldData();
     } else if (activeTab === 'employees') {
       fetchEmpPerformance();
+    } else if (activeTab === 'employee-management') {
+      fetchEmployeesList();
+      fetchBranchesList();
     } else if (activeTab === 'branches') {
       fetchBranchPerformance();
     } else if (activeTab === 'timeline') {
@@ -470,6 +483,86 @@ export default function MDDashboard() {
     }
   };
 
+  const handleAddBranch = async () => {
+    if (!newBranchData.branch_name) {
+      alert('Branch Name is required');
+      return;
+    }
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/md/branch', {
+        method: 'POST',
+        body: JSON.stringify(newBranchData)
+      });
+
+      if (res.ok) {
+        setIsAddBranchModalOpen(false);
+        setNewBranchData({ branch_name: '', city: '', state: '', address: '' });
+        fetchBranchPerformance();
+      } else {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error creating branch');
+    }
+  };
+
+  const fetchEmployeesList = async () => {
+    setLoading(true);
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/md/employees');
+      if (res.ok) {
+        const data = await res.json();
+        setEmployeesList(data);
+      }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
+  };
+
+  const fetchBranchesList = async () => {
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/md/branches-list');
+      if (res.ok) {
+        const data = await res.json();
+        setBranchesList(data);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleSaveEmployee = async () => {
+    if (!employeeForm.name || !employeeForm.role || !employeeForm.mobile || !employeeForm.email || (!employeeForm.id && !employeeForm.password)) {
+      alert('Please fill all required fields');
+      return;
+    }
+    try {
+      const method = employeeForm.id ? 'PUT' : 'POST';
+      const url = employeeForm.id ? `http://localhost:5000/api/md/employee/${employeeForm.id}` : 'http://localhost:5000/api/md/employee';
+      const res = await authenticatedFetch(url, {
+        method,
+        body: JSON.stringify(employeeForm)
+      });
+      if (res.ok) {
+        setIsEmployeeModalOpen(false);
+        fetchEmployeesList();
+      } else {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error saving employee');
+    }
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    if (!window.confirm('Are you sure you want to deactivate this employee?')) return;
+    try {
+      const res = await authenticatedFetch(`http://localhost:5000/api/md/employee/${id}`, { method: 'DELETE' });
+      if (res.ok) fetchEmployeesList();
+      else alert('Failed to deactivate employee');
+    } catch (err) { console.error(err); }
+  };
+
   const getStatusBadge = (status: string) => {
     let classes = 'bg-slate-100 text-slate-700';
     if (status === 'SENT_TO_RM') classes = 'bg-amber-100 text-amber-700 border border-amber-200';
@@ -539,6 +632,7 @@ export default function MDDashboard() {
             { id: 'funds', label: 'Fund Approvals', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
             { id: 'revenue', label: 'Revenue Reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 01-2 2h-2a2 2 0 01-2-2zm9-1h2a2 2 0 002-2v-3a2 2 0 00-2-2h-2a2 2 0 00-2 2v3a2 2 0 002 2zm-8-3H8v3h2v-3z' },
             { id: 'gold', label: 'Gold Collection', icon: 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z' },
+            { id: 'employee-management', label: 'Employee Management', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
             { id: 'employees', label: 'Employee Performance', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
             { id: 'branches', label: 'Branch Performance', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
             { id: 'timeline', label: 'Case Timeline', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
@@ -1319,9 +1413,17 @@ export default function MDDashboard() {
               {/* 7. BRANCH PERFORMANCE PAGE */}
               {activeTab === 'branches' && (
                 <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 animate-fadeIn">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 mb-4">Branch Performance</h3>
-                  <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
-                    <table className="w-full min-w-[700px] border-collapse text-left text-xs">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Branch Performance</h3>
+                    <button
+                      onClick={() => setIsAddBranchModalOpen(true)}
+                      className="px-3 py-1.5 bg-[#4d0711] text-amber-500 rounded-lg text-[10px] font-bold hover:bg-[#2e040a] transition-all cursor-pointer shadow-sm"
+                    >
+                      + Add New Branch
+                    </button>
+                  </div>
+                  <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                    <table className="w-full border-collapse text-left text-xs">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
                           <th className="p-4">Branch</th>
@@ -1441,6 +1543,63 @@ export default function MDDashboard() {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 8.5 EMPLOYEE MANAGEMENT PAGE */}
+              {activeTab === 'employee-management' && (
+                <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 animate-fadeIn">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Employee Management</h3>
+                    <button
+                      onClick={() => {
+                        setEmployeeForm({ id: '', branch_id: branchesList.length > 0 ? branchesList[0].id : '', name: '', role: 'TELECALLER', mobile: '', email: '', password: '' });
+                        setIsEmployeeModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-[#4d0711] text-amber-500 rounded-lg text-[10px] font-bold hover:bg-[#2e040a] transition-all cursor-pointer shadow-sm"
+                    >
+                      + Create New Employee
+                    </button>
+                  </div>
+                  <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
+                          <th className="p-4">Name</th>
+                          <th className="p-4">Role</th>
+                          <th className="p-4">Branch</th>
+                          <th className="p-4">Mobile</th>
+                          <th className="p-4">Email</th>
+                          <th className="p-4">Status</th>
+                          <th className="p-4 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {employeesList.length === 0 ? (
+                          <tr><td colSpan={7} className="p-8 text-center text-slate-400 italic">No employees found.</td></tr>
+                        ) : (
+                          employeesList.map((emp, i) => (
+                            <tr key={i} className="hover:bg-slate-50/50">
+                              <td className="p-4 font-extrabold text-[#4d0711]">{emp.name}</td>
+                              <td className="p-4 font-black text-slate-750">{emp.role}</td>
+                              <td className="p-4 font-semibold text-emerald-600">{emp.branches?.branch_name || 'N/A'}</td>
+                              <td className="p-4 font-semibold text-teal-650">{emp.mobile}</td>
+                              <td className="p-4 font-bold text-slate-800">{emp.email}</td>
+                              <td className="p-4 font-black text-amber-700">
+                                <span className={`px-2 py-1 rounded text-[10px] ${emp.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{emp.status}</span>
+                              </td>
+                              <td className="p-4 flex items-center justify-center gap-2">
+                                <button onClick={() => { setEmployeeForm({...emp, password: ''}); setIsEmployeeModalOpen(true); }} className="px-2 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded text-[10px] font-bold hover:bg-blue-100 cursor-pointer">Edit</button>
+                                {emp.status === 'active' && (
+                                  <button onClick={() => handleDeleteEmployee(emp.id)} className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-[10px] font-bold hover:bg-red-100 cursor-pointer">Deactivate</button>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
@@ -1594,6 +1753,188 @@ export default function MDDashboard() {
         </div>
       )}
 
+      {/* ADD BRANCH MODAL */}
+      {isAddBranchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl flex flex-col gap-4 animate-scaleUp">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+              <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide">
+                Add New Branch
+              </h3>
+              <button
+                onClick={() => setIsAddBranchModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Branch Name *</label>
+                <input
+                  type="text"
+                  value={newBranchData.branch_name}
+                  onChange={(e) => setNewBranchData({ ...newBranchData, branch_name: e.target.value })}
+                  placeholder="e.g. Mumbai"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">City</label>
+                <input
+                  type="text"
+                  value={newBranchData.city}
+                  onChange={(e) => setNewBranchData({ ...newBranchData, city: e.target.value })}
+                  placeholder="e.g. Mumbai"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">State</label>
+                <input
+                  type="text"
+                  value={newBranchData.state}
+                  onChange={(e) => setNewBranchData({ ...newBranchData, state: e.target.value })}
+                  placeholder="e.g. Maharashtra"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Address</label>
+                <textarea
+                  value={newBranchData.address}
+                  onChange={(e) => setNewBranchData({ ...newBranchData, address: e.target.value })}
+                  placeholder="Full branch address..."
+                  rows={2}
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <button
+                onClick={() => setIsAddBranchModalOpen(false)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddBranch}
+                className="w-full py-2.5 bg-[#4d0711] hover:bg-[#2e040a] text-amber-400 font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                Save Branch
+              </button>
+            </div>
+          </div>
+        </div>
+  )}
+
+  {/* ADD/EDIT EMPLOYEE MODAL */}
+  {isEmployeeModalOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl flex flex-col gap-4 animate-scaleUp">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+          <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide">
+            {employeeForm.id ? 'Edit Employee' : 'Create New Employee'}
+          </h3>
+          <button onClick={() => setIsEmployeeModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Branch *</label>
+            <select
+              value={employeeForm.branch_id}
+              onChange={(e) => setEmployeeForm({ ...employeeForm, branch_id: e.target.value })}
+              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+            >
+              <option value="">Select Branch</option>
+              {branchesList.map(b => (
+                <option key={b.id} value={b.id}>{b.branch_name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Role *</label>
+            <select
+              value={employeeForm.role}
+              onChange={(e) => setEmployeeForm({ ...employeeForm, role: e.target.value })}
+              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+            >
+              <option value="TELECALLER">Telecaller</option>
+              <option value="RM">RM (Relationship Manager)</option>
+              <option value="EXECUTIVE">Executive</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Name *</label>
+            <input
+              type="text"
+              value={employeeForm.name}
+              onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })}
+              placeholder="Employee Name"
+              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mobile *</label>
+            <input
+              type="text"
+              value={employeeForm.mobile}
+              onChange={(e) => setEmployeeForm({ ...employeeForm, mobile: e.target.value })}
+              placeholder="Mobile Number"
+              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Email *</label>
+            <input
+              type="email"
+              value={employeeForm.email}
+              onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
+              placeholder="Email Address"
+              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Password {employeeForm.id ? '(Leave blank to keep current)' : '*'}</label>
+            <input
+              type="password"
+              value={employeeForm.password}
+              onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
+              placeholder="Password"
+              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mt-2">
+          <button
+            onClick={() => setIsEmployeeModalOpen(false)}
+            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSaveEmployee}
+            className="w-full py-2.5 bg-[#4d0711] hover:bg-[#2e040a] text-amber-400 font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+          >
+            {employeeForm.id ? 'Save Changes' : 'Create Employee'}
+          </button>
+        </div>
+      </div>
     </div>
+  )}
+
+</div>
   );
 }
