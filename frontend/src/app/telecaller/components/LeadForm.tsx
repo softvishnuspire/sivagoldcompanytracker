@@ -298,6 +298,18 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         </button>
       </div>
 
+      {editingLead && editingLead.status === 'RM_REVERIFICATION' && (
+        <div className="mb-6 p-4 rounded-xl bg-orange-50 border border-orange-200 text-orange-850 flex items-start gap-3 animate-fadeIn">
+          <AlertCircle size={20} className="text-orange-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="text-sm font-extrabold text-orange-950 uppercase tracking-wide">Re-Verification Requested by RM</h4>
+            <p className="text-xs text-orange-700 leading-relaxed font-semibold">
+              {editingLead.reverificationRemarks || 'Please review the documents and lead details, correct any errors, and save changes to resubmit to RM.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Steps indicator */}
       <div className="flex items-center justify-between mb-8 max-w-md mx-auto">
         {steps.map((s, idx) => {

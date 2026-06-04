@@ -718,14 +718,23 @@ app.post('/api/telecaller/leads', authenticateToken, requireRole(['TELECALLER'])
     if (insertError) throw insertError;
 
     // Insert documents
-    if (documents && documents.length > 0) {
-      const dbDocs = documents.map(d => ({
-        id: crypto.randomUUID(),
-        lead_id: leadId,
-        document_type: d.documentType,
-        file_url: d.fileUrl || '#',
-        uploaded_by: req.user.id
-      }));
+    if (documents && Array.isArray(documents) && documents.length > 0) {
+      const dbDocs = documents.map(d => {
+        let docType = d.documentType || 'OTHER';
+        if (docType === 'KYC') {
+          const lowerName = (d.fileName || '').toLowerCase();
+          docType = lowerName.includes('pan') ? 'PAN' : 'AADHAR';
+        } else if (docType === 'ADDITIONAL') {
+          docType = 'OTHER';
+        }
+        return {
+          id: crypto.randomUUID(),
+          lead_id: leadId,
+          document_type: docType,
+          file_url: d.fileUrl || '#',
+          uploaded_by: toValidUuid(req.user.id)
+        };
+      });
       const { error: docErr } = await supabase.from('lead_documents').insert(dbDocs);
       if (docErr) console.error('Error inserting documents:', docErr);
     }
@@ -761,7 +770,8 @@ app.put('/api/telecaller/leads/:id', authenticateToken, requireRole(['TELECALLER
       branchName,
       loanAmount,
       loanAccountNumber,
-      status
+      status,
+      documents
     } = req.body;
 
     // Verify ownership
@@ -802,6 +812,36 @@ app.put('/api/telecaller/leads/:id', authenticateToken, requireRole(['TELECALLER
       .single();
 
     if (updateError) throw updateError;
+
+    // Update documents if provided
+    if (documents) {
+      // 1. Delete old documents first
+      await supabase.from('lead_documents').delete().eq('lead_id', id);
+
+      // 2. Insert new documents if any
+      if (Array.isArray(documents) && documents.length > 0) {
+        const dbDocs = documents.map(d => {
+          let docType = d.documentType || 'OTHER';
+          if (docType === 'KYC') {
+            const lowerName = (d.fileName || '').toLowerCase();
+            docType = lowerName.includes('pan') ? 'PAN' : 'AADHAR';
+          } else if (docType === 'ADDITIONAL') {
+            docType = 'OTHER';
+          }
+          return {
+            id: crypto.randomUUID(),
+            lead_id: id,
+            document_type: docType,
+            file_url: d.fileUrl || '#',
+            uploaded_by: toValidUuid(req.user.id)
+          };
+        });
+        const { error: docError } = await supabase.from('lead_documents').insert(dbDocs);
+        if (docError) {
+          console.error(`[PUT /api/telecaller/leads/${id}] Document insert failed:`, docError.message);
+        }
+      }
+    }
 
     // Insert timeline
     await supabase.from('lead_timeline').insert({
@@ -1442,6 +1482,54 @@ app.get('/api/rm/reports', authenticateToken, requireRole(['RM']), async (req, r
 // =========================================================================
 // STANDARD ENDPOINTS
 // =========================================================================
+// Unified Document Manager Endpoint for all roles
+app.get('/api/documents/leads', authenticateToken, requireRole(['TELECALLER', 'RM', 'EXECUTIVE', 'MD']), async (req, res) => {
+  try {
+    const { data: leads, error } = await supabase
+      .from('leads')
+      .select(`
+        id,
+        lead_number,
+        customer_name,
+        current_status,
+        created_at,
+        lead_documents (
+          id,
+          document_type,
+          file_url,
+          created_at,
+          uploaded_by,
+          uploader:uploaded_by (name, role)
+        ),
+        gold_images (
+          id,
+          image_url,
+          created_at,
+          uploaded_by,
+          uploader:uploaded_by (name, role)
+        ),
+        payments (
+          id,
+          payment_proof,
+          created_at,
+          created_by,
+          uploader:created_by (name, role)
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching documents/leads:', error.message);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json(leads || []);
+  } catch (err) {
+    console.error('Error in documents/leads endpoint:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running smoothly', dbConnected: !!supabaseUrl });

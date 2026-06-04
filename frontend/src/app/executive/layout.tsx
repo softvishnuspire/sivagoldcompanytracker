@@ -67,8 +67,7 @@ export default function ExecutiveLayout({ children }: { children: React.ReactNod
     { label: 'In Progress', path: '/executive/in-progress', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
     { label: 'Completed Cases', path: '/executive/completed', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
     { label: 'Payments', path: '/executive/payments', icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
-    { label: 'Documents', path: '/executive/documents', icon: 'M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-8L8 4z' },
-    { label: 'Gallery', path: '/executive/gallery', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
+    { label: 'Document Manager', path: '/executive/document-manager', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
     { label: 'Call Logs', path: '/executive/call-logs', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' },
     { label: 'Reports', path: '/executive/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 01-2 2h-2a2 2 0 01-2-2zm9-1h2a2 2 0 002-2v-3a2 2 0 00-2-2h-2a2 2 0 00-2 2v3a2 2 0 002 2zm-8-3H8v3h2v-3z' },
     { label: 'Profile', path: '/executive/profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
@@ -94,15 +93,23 @@ export default function ExecutiveLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex bg-[#f4f5f8] text-slate-800 font-sans selection:bg-[#c3902c] selection:text-black antialiased">
+    <div className="h-screen w-screen overflow-hidden flex flex-col md:flex-row bg-[#f4f5f8] text-slate-800 font-sans selection:bg-[#c3902c] selection:text-black antialiased">
       
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-45 md:hidden animate-fadeIn"
+        />
+      )}
+
       {/* Mobile Top Bar */}
       <header className="md:hidden flex items-center justify-between px-6 py-4 bg-[#4d0711] border-b border-[#691823]/20 sticky top-0 z-40 w-full shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 flex items-center justify-center overflow-hidden">
             <img src="/logo.png" alt="Siva Gold Logo" className="w-full h-full object-contain" />
           </div>
-          <span className="font-extrabold tracking-wider text-amber-300 font-mono text-sm">SIVA GOLD</span>
+          <span className="font-extrabold tracking-wider text-amber-300 font-mono text-sm">{getPageTitle()}</span>
         </div>
         <button 
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -177,7 +184,7 @@ export default function ExecutiveLayout({ children }: { children: React.ReactNod
         <div className="px-4 pb-4 border-b border-[#691823]/10">
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-amber-300 hover:bg-rose-500/10 hover:text-rose-450 border border-amber-500/30 hover:border-rose-500/40 transition-all cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-amber-300 hover:bg-rose-500/10 hover:text-rose-455 border border-amber-500/30 hover:border-rose-500/40 transition-all cursor-pointer"
           >
             <svg className="w-4 h-4 shrink-0 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -202,7 +209,7 @@ export default function ExecutiveLayout({ children }: { children: React.ReactNod
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
         
         {/* Header Toolbar */}
-        <header className="bg-white border-b border-slate-200/80 px-8 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm shrink-0">
+        <header className="hidden md:flex bg-white border-b border-slate-200/80 px-8 py-4 items-center justify-between sticky top-0 z-20 shadow-sm shrink-0">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-extrabold tracking-tight text-slate-900 capitalize">
               {getPageTitle()}
@@ -232,7 +239,7 @@ export default function ExecutiveLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Workspace Container */}
-        <main className="flex-1 p-8 overflow-y-auto relative bg-[#f4f5f8]">
+        <main className="flex-1 p-4 sm:p-8 overflow-y-auto relative bg-[#f4f5f8]">
           <div className="max-w-7xl w-full mx-auto animate-fadeIn">
             {children}
           </div>

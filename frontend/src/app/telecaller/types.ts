@@ -69,6 +69,7 @@ export interface Lead {
   updatedAt: string;
   documents?: Document[];
   followups?: Followup[];
+  reverificationRemarks?: string;
 }
 
 export interface DashboardStats {

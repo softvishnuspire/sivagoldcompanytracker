@@ -82,8 +82,8 @@ export default function AssignedLeadsPage() {
             No leads currently assigned to you. Contact your RM to get assignments.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="w-full min-w-[800px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/50 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                   <th className="px-6 py-4 font-semibold">Lead ID</th>

@@ -53,8 +53,8 @@ export default function ProfilePage() {
   return (
     <div className="max-w-xl mx-auto space-y-6 animate-fadeIn text-slate-800">
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">My Profile</h1>
-        <p className="text-slate-500 text-sm mt-1">Manage and view your employee credentials and assigned branch.</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">My Profile</h1>
+        <p className="text-slate-500 text-xs sm:text-sm mt-1">Manage and view your employee credentials and assigned branch.</p>
       </div>
 
       {error && (

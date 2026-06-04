@@ -108,8 +108,8 @@ export default function PaymentsPage() {
       
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Payments Registry</h1>
-        <p className="text-slate-500 text-sm mt-1">Review disbursed funds, balance settlements, and financial tracking details.</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Payments Registry</h1>
+        <p className="text-slate-500 text-xs sm:text-sm mt-1">Review disbursed funds, balance settlements, and financial tracking details.</p>
       </div>
 
       <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
@@ -118,8 +118,8 @@ export default function PaymentsPage() {
             No payment records found. Run the payout steps in lead processing to record transactions.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="w-full min-w-[900px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/50 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                   <th className="px-6 py-4 font-semibold">Lead ID</th>

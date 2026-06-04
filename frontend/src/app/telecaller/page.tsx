@@ -26,12 +26,13 @@ import LeadList from './components/LeadList';
 import FollowupList from './components/FollowupList';
 import ReportsView from './components/ReportsView';
 import PendingFollowupsList from './components/PendingFollowupsList';
+import DocumentManager from '@/components/DocumentManager';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function TelecallerDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'pending-followups' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'add-lead' | 'leads-list' | 'follow-ups' | 'pending-followups' | 'reports' | 'document-manager'>('dashboard');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -97,6 +98,12 @@ export default function TelecallerDashboard() {
         createdAt: i.created_at
       }));
 
+    // Extract latest RM reverification remarks from timeline
+    const reverificationTimeline = (db.timeline || [])
+      .filter((t: any) => t.status === 'RM_REVERIFICATION')
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const reverificationRemarks = reverificationTimeline[0]?.remarks || undefined;
+
     return {
       id: db.id,
       leadNumber: db.lead_number,
@@ -119,7 +126,8 @@ export default function TelecallerDashboard() {
       createdAt: db.created_at,
       updatedAt: db.updated_at,
       documents,
-      followups
+      followups,
+      reverificationRemarks
     };
   };
 
@@ -214,6 +222,8 @@ export default function TelecallerDashboard() {
       let res;
       if (formData.id) {
         // Editing lead
+        // Transition status back to SENT_TO_RM if it was RM_REVERIFICATION
+        const targetStatus = formData.status === 'RM_REVERIFICATION' ? 'SENT_TO_RM' : formData.status;
         res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${formData.id}`, {
           method: 'PUT',
           body: JSON.stringify({
@@ -229,7 +239,8 @@ export default function TelecallerDashboard() {
             branchName: formData.branchName,
             loanAmount: formData.loanAmount,
             loanAccountNumber: formData.loanAccountNumber,
-            status: formData.status
+            status: targetStatus,
+            documents: formData.documents
           })
         });
       } else {
@@ -363,6 +374,7 @@ export default function TelecallerDashboard() {
     { id: 'add-lead' as const, label: 'Add Lead', icon: PlusCircle },
     { id: 'pending-followups' as const, label: 'Pending Followups', icon: Clock },
     { id: 'follow-ups' as const, label: 'Follow-ups', icon: PhoneCall },
+    { id: 'document-manager' as const, label: 'Document Manager', icon: FileText },
     { id: 'reports' as const, label: 'Reports', icon: BarChart3 }
   ];
 
@@ -648,6 +660,12 @@ export default function TelecallerDashboard() {
             {activeTab === 'reports' && (
               <div className="animate-fadeIn">
                 <ReportsView leads={leads} />
+              </div>
+            )}
+
+            {activeTab === 'document-manager' && (
+              <div className="animate-fadeIn">
+                <DocumentManager />
               </div>
             )}
           </div>

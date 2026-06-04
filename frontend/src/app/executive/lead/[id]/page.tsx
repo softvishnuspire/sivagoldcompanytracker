@@ -129,6 +129,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
   const [previewDocType, setPreviewDocType] = useState<string | null>(null);
   const [previewDocName, setPreviewDocName] = useState<string | null>(null);
+  const [timelineCollapsed, setTimelineCollapsed] = useState(true);
 
   const downloadDocument = (url: string, filename: string) => {
     const link = document.createElement('a');
@@ -303,18 +304,18 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
     <div className="space-y-6 animate-fadeIn pb-12 text-slate-800">
       
       {/* Top Navigation */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => router.push('/executive/assigned')}
-            className="text-[#c3902c] hover:text-amber-600 text-xs font-bold hover:scale-105 transition-transform"
+            className="text-[#c3902c] hover:text-amber-600 text-xs font-bold hover:scale-105 transition-transform cursor-pointer"
           >
             ← Back to Assigned
           </button>
           <span className="text-slate-300">|</span>
           <span className="text-xs font-semibold text-slate-500">Lead ID: {lead.lead_number || lead.id.slice(0, 8)}</span>
         </div>
-        <div>
+        <div className="self-start sm:self-auto">
           <span className="inline-block px-3 py-1 rounded bg-amber-100 border border-amber-200 text-amber-700 text-xs font-bold uppercase">
             Status: {lead.current_status.replace(/_/g, ' ')}
           </span>
@@ -1089,16 +1090,35 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
         {/* Right Column: Timeline Panel */}
         <div className="space-y-6">
           
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 h-[500px] flex flex-col shadow-sm">
-            <h3 className="font-bold text-sm tracking-wider text-slate-800 uppercase border-b border-slate-100 pb-2 mb-4 flex items-center gap-2">
-              <svg className="w-4 h-4 text-[#c3902c] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              Lead Journey Timeline
-            </h3>
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 md:h-[500px] flex flex-col shadow-sm">
+            <button 
+              onClick={() => setTimelineCollapsed(!timelineCollapsed)}
+              className="w-full flex items-center justify-between border-b border-slate-100 pb-2 mb-4 md:pointer-events-none md:border-b-0 md:pb-0 md:mb-4 focus:outline-none"
+            >
+              <h3 className="font-bold text-sm tracking-wider text-slate-800 uppercase flex items-center gap-2">
+                <svg className="w-4 h-4 text-[#c3902c] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Lead Journey Timeline
+              </h3>
+              <div className="md:hidden text-amber-600">
+                {timelineCollapsed ? (
+                  <svg className="w-5 h-5 transform transition-transform duration-250" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 transform rotate-180 transition-transform duration-250" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+                  </svg>
+                )}
+              </div>
+            </button>
 
             {/* Timeline Scroll Box */}
-            <div className="flex-1 overflow-y-auto pr-2 space-y-6 custom-scrollbar text-xs font-mono relative">
+            <div className={`
+              ${timelineCollapsed ? 'hidden md:block' : 'block'} 
+              flex-1 overflow-y-auto pr-2 space-y-6 custom-scrollbar text-xs font-mono relative mt-2 md:mt-0 min-h-[250px] md:min-h-0
+            `}>
               
               <div className="absolute left-3.5 top-2 bottom-2 w-0.5 bg-slate-200 z-0"></div>
 
@@ -1110,7 +1130,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                     <div key={event.id} className="flex gap-4 relative z-10">
                       
                       {/* Node indicator */}
-                      <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 text-slate-650 flex items-center justify-center font-bold text-[10px] shrink-0 shadow-sm animate-fadeIn">
+                      <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 text-slate-655 flex items-center justify-center font-bold text-[10px] shrink-0 shadow-sm animate-fadeIn">
                         {idx + 1}
                       </div>
 
@@ -1118,7 +1138,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       <div className="space-y-1 py-1">
                         <div className="flex items-center gap-2">
                           <span className="text-[#c3902c] uppercase text-[10px] font-bold tracking-wider">{event.status.replace(/_/g, ' ')}</span>
-                          <span className="text-slate-450 text-[9px]">{timeStr} ({dateStr})</span>
+                          <span className="text-slate-455 text-[9px]">{timeStr} ({dateStr})</span>
                         </div>
                         <p className="text-slate-600 font-sans text-xs">{event.remarks || 'No notes'}</p>
                       </div>
@@ -1127,7 +1147,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                   );
                 })
               ) : (
-                <div className="text-center text-slate-450 italic py-8">
+                <div className="text-center text-slate-455 italic py-8">
                   Timeline empty. Complete step actions to generate milestones.
                 </div>
               )}

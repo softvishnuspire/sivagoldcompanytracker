@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import DocumentManager from '@/components/DocumentManager';
 import {
   ResponsiveContainer,
   LineChart,
@@ -128,6 +129,7 @@ export default function MDDashboard() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [loading, setLoading] = useState<boolean>(true);
   const [isClient, setIsClient] = useState<boolean>(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   // Auth states
   const [profile, setProfile] = useState<any>({ name: 'MD Shiva Gold', employee_code: 'MD001', role: 'MD' });
@@ -388,6 +390,8 @@ export default function MDDashboard() {
       fetchBranchPerformance();
     } else if (activeTab === 'timeline') {
       fetchTimeline();
+    } else if (activeTab === 'document-manager') {
+      setLoading(false);
     }
   }, [activeTab]);
 
@@ -502,12 +506,20 @@ export default function MDDashboard() {
   );
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex bg-[#f4f5f8] text-slate-800 font-sans selection:bg-[#c3902c] selection:text-black">
+    <div suppressHydrationWarning className="h-screen w-screen overflow-hidden flex bg-[#f4f5f8] text-slate-800 font-sans selection:bg-[#c3902c] selection:text-black">
       
+      {/* Backdrop overlay for mobile */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 z-35 bg-black/40 backdrop-blur-xs md:hidden animate-fadeIn"
+        />
+      )}
+
       {/* ===================================================================
           SIDEBAR PANEL (Burgundy Theme matching RM)
           =================================================================== */}
-      <aside className="w-72 h-full bg-gradient-to-b from-[#4d0711] to-[#200206] border-r border-[#691823]/20 flex flex-col z-30 shrink-0 select-none">
+      <aside className={`fixed md:relative top-0 left-0 w-72 h-full bg-gradient-to-b from-[#4d0711] to-[#200206] border-r border-[#691823]/20 flex flex-col z-40 shrink-0 select-none transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         
         {/* Branding Header */}
         <div className="py-2 px-4 border-b border-[#691823]/20 flex flex-col items-center justify-center bg-[#4d0b13]/10">
@@ -530,6 +542,7 @@ export default function MDDashboard() {
             { id: 'employees', label: 'Employee Performance', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
             { id: 'branches', label: 'Branch Performance', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
             { id: 'timeline', label: 'Case Timeline', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+            { id: 'document-manager', label: 'Document Manager', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
             { id: 'reports', label: 'Reports', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' }
           ].map((item) => (
             <button
@@ -537,6 +550,7 @@ export default function MDDashboard() {
               onClick={() => {
                 setActiveTab(item.id);
                 closeInspection();
+                setIsSidebarOpen(false);
               }}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all group cursor-pointer ${
                 activeTab === item.id
@@ -559,6 +573,7 @@ export default function MDDashboard() {
               localStorage.removeItem('siva_token');
               localStorage.removeItem('siva_user');
               window.location.href = '/';
+              setIsSidebarOpen(false);
             }}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-amber-200/70 hover:bg-rose-500/10 hover:text-rose-455 border border-[#691823]/30 hover:border-rose-500/20 transition-all cursor-pointer"
           >
@@ -581,30 +596,39 @@ export default function MDDashboard() {
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
         
         {/* Header Toolbar */}
-        <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between z-20 shadow-sm">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-extrabold tracking-tight text-slate-900 capitalize">
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3 sm:py-4 flex items-center justify-between z-20 shadow-sm">
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl md:hidden transition-all cursor-pointer mr-1"
+              title="Open Menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h2 className="text-sm sm:text-lg font-extrabold tracking-tight text-slate-900 capitalize truncate">
               {inspecting ? 'Lead Details (Read Only)' : activeTab.replace(/-list|-/g, ' ')}
             </h2>
             {inspecting && leadDetail && (
-              <span className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-mono font-bold text-slate-700">
+              <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold text-slate-700">
                 {leadDetail.lead.lead_number}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-5">
-            <div className="text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-sm">
+          <div className="flex items-center gap-3 sm:gap-5">
+            <div className="hidden lg:flex text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl items-center gap-1.5 shadow-sm">
               <span>📅</span>
               <span>03 June 2026, Wednesday</span>
             </div>
 
             {/* User credentials */}
-            <div className="flex items-center gap-2.5 border-l border-slate-200 pl-5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-bold text-slate-800">
+            <div className="flex items-center gap-2 md:border-l md:border-slate-200 md:pl-5">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-bold text-xs sm:text-sm text-slate-800 shrink-0">
                 MD
               </div>
-              <div className="flex flex-col">
+              <div className="hidden md:flex flex-col">
                 <span className="text-xs font-bold text-slate-800 leading-none">{profile.name}</span>
                 <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Managing Director</span>
               </div>
@@ -613,7 +637,7 @@ export default function MDDashboard() {
         </header>
 
         {/* Dashboard Panels */}
-        <main className="flex-1 p-8 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
           
           {loading ? (
             <div className="flex flex-col items-center justify-center py-32 gap-3">
@@ -642,7 +666,7 @@ export default function MDDashboard() {
                 <div className="lg:col-span-2 flex flex-col gap-6">
                   
                   {/* Grid fields */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     {/* Customer info */}
                     <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-3">
                       <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Customer Information</h3>
@@ -725,7 +749,7 @@ export default function MDDashboard() {
                   </div>
 
                   {/* Documents Section */}
-                  <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-4">
+                  <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Uploaded Documents</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="flex flex-col gap-2">
@@ -761,7 +785,7 @@ export default function MDDashboard() {
                                 Open in New Tab ↗
                               </a>
                             </div>
-                            <div className="flex-1 relative w-full h-[220px] bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center">
+                            <div className="flex-1 relative w-full h-[180px] sm:h-[220px] bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center">
                               {previewDoc.startsWith('data:image') || previewDoc.includes('.png') || previewDoc.includes('.jpg') || previewDoc.includes('.jpeg') ? (
                                 <img
                                   src={previewDoc}
@@ -896,7 +920,7 @@ export default function MDDashboard() {
                 <div className="flex flex-col gap-8 animate-fadeIn">
                   
                   {/* Top Summary Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
                     {[
                       { title: 'Total Leads', val: stats.totalLeads, icon: '📂', bg: 'bg-blue-500/10 text-blue-600 border border-blue-500/20' },
                       { title: 'Qualified Leads', val: stats.qualifiedLeads, icon: '⭐', bg: 'bg-purple-500/10 text-purple-600 border border-purple-500/20' },
@@ -907,7 +931,7 @@ export default function MDDashboard() {
                       { title: 'Revenue Today', val: `₹${stats.revenueToday.toLocaleString('en-IN')}`, icon: '💰', bg: 'bg-green-500/10 text-green-600 border border-green-500/20' },
                       { title: 'Conversion Rate', val: `${stats.conversionRate}%`, icon: '📈', bg: 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/20' }
                     ].map((card, idx) => (
-                      <div key={idx} className="bg-white border border-slate-200/80 shadow-sm p-6 rounded-2xl flex items-center justify-between hover:shadow-md transition-all">
+                      <div key={idx} className="bg-white border border-slate-200/80 shadow-sm p-4 sm:p-6 rounded-2xl flex items-center justify-between hover:shadow-md transition-all">
                         <div className="flex flex-col gap-1.5">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{card.title}</span>
                           <span className="text-2xl font-black text-slate-900">{card.val}</span>
@@ -952,8 +976,8 @@ export default function MDDashboard() {
                     </span>
                   </div>
 
-                  <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                    <table className="w-full border-collapse text-left text-xs">
+                  <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                    <table className="w-full min-w-[700px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
                           <th className="p-4">Lead ID</th>
@@ -1008,8 +1032,8 @@ export default function MDDashboard() {
                     </span>
                   </div>
 
-                  <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                    <table className="w-full border-collapse text-left text-xs">
+                  <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                    <table className="w-full min-w-[800px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
                           <th className="p-4">Request ID</th>
@@ -1076,14 +1100,14 @@ export default function MDDashboard() {
                 <div className="flex flex-col gap-6 animate-fadeIn">
                   
                   {/* Revenue Summary Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
                     {[
                       { title: "Today's Revenue", val: revenueData.today, icon: "💵" },
                       { title: "Weekly Revenue", val: revenueData.week, icon: "📊" },
                       { title: "Monthly Revenue", val: revenueData.month, icon: "🏛️" },
                       { title: "Yearly Revenue", val: revenueData.year, icon: "👑" }
                     ].map((card, idx) => (
-                      <div key={idx} className="bg-white border border-slate-200/80 shadow-sm p-6 rounded-2xl flex items-center justify-between">
+                      <div key={idx} className="bg-white border border-slate-200/80 shadow-sm p-4 sm:p-6 rounded-2xl flex items-center justify-between">
                         <div className="flex flex-col gap-1.5">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{card.title}</span>
                           <span className="text-2xl font-black text-slate-900">₹{Number(card.val || 0).toLocaleString('en-IN')}</span>
@@ -1158,8 +1182,8 @@ export default function MDDashboard() {
                   {/* Collections List */}
                   <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 mb-4">Gold Ornaments collection log</h3>
-                    <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                      <table className="w-full border-collapse text-left text-xs">
+                    <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full min-w-[800px] border-collapse text-left text-xs">
                         <thead>
                           <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
                             <th className="p-4">Lead ID</th>
@@ -1205,8 +1229,8 @@ export default function MDDashboard() {
                   {/* Telecallers Performance */}
                   <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6">
                     <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider border-b border-slate-100 pb-3 mb-4">Telecaller Performance</h3>
-                    <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                      <table className="w-full border-collapse text-left text-xs">
+                    <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full min-w-[600px] border-collapse text-left text-xs">
                         <thead>
                           <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
                             <th className="p-4">Telecaller Name</th>
@@ -1232,8 +1256,8 @@ export default function MDDashboard() {
                   {/* RM Performance */}
                   <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6">
                     <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider border-b border-slate-100 pb-3 mb-4">RM Performance</h3>
-                    <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                      <table className="w-full border-collapse text-left text-xs">
+                    <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full min-w-[700px] border-collapse text-left text-xs">
                         <thead>
                           <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
                             <th className="p-4">RM Name</th>
@@ -1261,8 +1285,8 @@ export default function MDDashboard() {
                   {/* Executive Performance */}
                   <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6">
                     <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider border-b border-slate-100 pb-3 mb-4">Executive Performance</h3>
-                    <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                      <table className="w-full border-collapse text-left text-xs">
+                    <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full min-w-[800px] border-collapse text-left text-xs">
                         <thead>
                           <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
                             <th className="p-4">Executive Name</th>
@@ -1296,8 +1320,8 @@ export default function MDDashboard() {
               {activeTab === 'branches' && (
                 <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 animate-fadeIn">
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 mb-4">Branch Performance</h3>
-                  <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                    <table className="w-full border-collapse text-left text-xs">
+                  <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                    <table className="w-full min-w-[700px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
                           <th className="p-4">Branch</th>
@@ -1385,8 +1409,8 @@ export default function MDDashboard() {
 
                   {/* Logs Table */}
                   <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6">
-                    <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                      <table className="w-full border-collapse text-left text-xs">
+                    <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full min-w-[800px] border-collapse text-left text-xs">
                         <thead>
                           <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
                             <th className="p-4">Lead ID</th>
@@ -1458,10 +1482,14 @@ export default function MDDashboard() {
                       >
                         📥 Export PDF
                       </button>
-                    </div>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
+
+            {activeTab === 'document-manager' && (
+              <DocumentManager />
+            )}
 
             </div>
           )}
@@ -1473,8 +1501,8 @@ export default function MDDashboard() {
           FUND REQUEST DECISION MODALS
           =================================================================== */}
       {fundModalType && activeFundRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl flex flex-col gap-4 animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col gap-4 animate-scaleUp">
             
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide">

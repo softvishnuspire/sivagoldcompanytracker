@@ -155,25 +155,25 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
         {statCards.map((card, idx) => (
           <div 
             key={idx} 
-            className="border border-slate-200/60 rounded-2xl p-6 flex items-center justify-between shadow-sm relative overflow-hidden bg-white transition-all duration-300 hover:scale-[1.015] hover:shadow-md hover:border-amber-500/20 group"
+            className="border border-slate-200/60 rounded-2xl p-4 sm:p-6 flex items-center justify-between shadow-sm relative overflow-hidden bg-white transition-all duration-300 hover:scale-[1.015] hover:shadow-md hover:border-amber-500/20 group"
           >
             {/* Top gold accent line */}
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500/20 via-[#c3902c] to-amber-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">{card.label}</span>
-                <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase border ${card.badgeColor}`}>{card.badge}</span>
+            <div className="space-y-2 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5">
+                <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">{card.label}</span>
+                <span className={`px-1.5 py-0.5 rounded text-[7px] sm:text-[8px] font-bold uppercase border ${card.badgeColor} self-start sm:self-auto truncate`}>{card.badge}</span>
               </div>
-              <p className="text-3xl font-black text-slate-800 tracking-tight">{card.value}</p>
+              <p className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight truncate">{card.value}</p>
             </div>
             
-            <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-[#c3902c] flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 shadow-sm">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 text-[#c3902c] flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 shadow-sm">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={card.icon} />
               </svg>
             </div>

@@ -52,8 +52,8 @@ export default function VisitsPage() {
   return (
     <div className="space-y-6 animate-fadeIn text-slate-800">
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">My Visits</h1>
-        <p className="text-slate-500 text-sm mt-1">Monitor scheduled customer appointments and ongoing travel journeys.</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">My Visits</h1>
+        <p className="text-slate-500 text-xs sm:text-sm mt-1">Monitor scheduled customer appointments and ongoing travel journeys.</p>
       </div>
 
       <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
@@ -62,8 +62,8 @@ export default function VisitsPage() {
             No active visits scheduled or in travel status.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="w-full min-w-[800px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/50 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                   <th className="px-6 py-4 font-semibold">Lead ID</th>

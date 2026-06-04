@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import DocumentManager from '@/components/DocumentManager';
 
 // =========================================================================
 // TYPES & INTERFACES
@@ -81,6 +82,7 @@ interface DashboardStats {
 export default function RMDashboard() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [loading, setLoading] = useState<boolean>(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   
   // Dashboard statistics & lists
   const [statsData, setStatsData] = useState<DashboardStats | null>(null);
@@ -149,6 +151,29 @@ export default function RMDashboard() {
     }
 
     return res;
+  };
+
+  const downloadDocument = (url: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename.replace(/\s+/g, '_');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleOpenOriginal = (url: string) => {
+    if (!url) return;
+    if (url.startsWith('data:')) {
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.document.write(`<img src="${url}" style="max-width:100%; max-height:100%; object-fit:contain;" alt="Original Document" />`);
+        newWindow.document.title = "Original Document";
+        newWindow.document.close();
+      }
+    } else {
+      window.open(url, '_blank', 'noreferrer');
+    }
   };
 
   const fetchDashboardData = async () => {
@@ -270,7 +295,7 @@ export default function RMDashboard() {
         const data = await res.json();
         setLeadDetail(data);
         if (data.documents && data.documents.length > 0) {
-          setPreviewDoc(data.documents[0].file_url);
+          setPreviewDoc(data.documents[0].file_url || data.documents[0].fileUrl);
         } else {
           setPreviewDoc(null);
         }
@@ -328,6 +353,8 @@ export default function RMDashboard() {
       fetchLeadSources();
     } else if (activeTab === 'activity-log') {
       fetchActivityLogs();
+    } else if (activeTab === 'document-manager') {
+      setLoading(false);
     } else {
       fetchTabList(activeTab);
     }
@@ -469,10 +496,18 @@ export default function RMDashboard() {
   return (
     <div suppressHydrationWarning className="h-screen w-screen overflow-hidden flex bg-[#f4f5f8] text-slate-800 font-sans selection:bg-[#c3902c] selection:text-black">
       
+      {/* Backdrop overlay for mobile */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 z-35 bg-black/40 backdrop-blur-xs md:hidden animate-fadeIn"
+        />
+      )}
+
       {/* ===================================================================
           SIDEBAR PANEL (Burgundy Theme)
           =================================================================== */}
-      <aside className="w-72 h-full bg-[#4d0711] border-r border-[#691823]/20 flex flex-col z-30 shrink-0 select-none">
+      <aside className={`fixed md:relative top-0 left-0 w-72 h-full bg-[#4d0711] border-r border-[#691823]/20 flex flex-col z-40 shrink-0 select-none transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         
         {/* Branding header */}
         <div className="py-2 px-4 border-b border-[#691823]/20 flex flex-col items-center justify-center bg-white/5">
@@ -493,6 +528,7 @@ export default function RMDashboard() {
             { id: 'all-leads', label: 'All Leads', icon: 'M4 6h16M4 12h16M4 18h7' },
             { id: 'executives-list', label: 'Executives', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a3 3 0 11-6 0 3 3 0 016 0z' },
             { id: 'reports', label: 'Reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 01-2 2h-2a2 2 0 01-2-2zm9-1h2a2 2 0 002-2v-3a2 2 0 00-2-2h-2a2 2 0 00-2 2v3a2 2 0 002 2zm-8-3H8v3h2v-3z' },
+            { id: 'document-manager', label: 'Document Manager', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
             { id: 'lead-sources', label: 'Lead Sources', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
             { id: 'activity-log', label: 'Activity Log', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
             { id: 'profile', label: 'My Profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' }
@@ -502,6 +538,7 @@ export default function RMDashboard() {
               onClick={() => {
                 setActiveTab(item.id);
                 closeInspection();
+                setIsSidebarOpen(false);
               }}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all group cursor-pointer ${
                 activeTab === item.id
@@ -524,6 +561,7 @@ export default function RMDashboard() {
               localStorage.removeItem('siva_token');
               localStorage.removeItem('siva_user');
               window.location.href = '/';
+              setIsSidebarOpen(false);
             }}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-amber-300 hover:bg-rose-500/10 hover:text-rose-300 border border-amber-500/30 hover:border-rose-500/40 transition-all cursor-pointer"
           >
@@ -552,37 +590,46 @@ export default function RMDashboard() {
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
         
         {/* Header Toolbar */}
-        <header className="bg-white border-b border-slate-200/80 px-8 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-extrabold tracking-tight text-slate-900 capitalize">
+        <header className="bg-white border-b border-slate-200/80 px-4 sm:px-8 py-3 sm:py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl md:hidden transition-all cursor-pointer mr-1"
+              title="Open Menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h2 className="text-sm sm:text-lg font-extrabold tracking-tight text-slate-900 capitalize truncate">
               {inspecting ? 'Lead Verification details' : activeTab.replace(/-list|-/g, ' ')}
             </h2>
             {inspecting && leadDetail && (
-              <span className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-mono font-bold text-slate-700">
+              <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold text-slate-700">
                 {leadDetail.lead.lead_number}
               </span>
             )}
           </div>
           
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-3 sm:gap-5">
             {/* Date display */}
-            <div className="text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-sm">
+            <div className="hidden lg:flex text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl items-center gap-1.5 shadow-sm">
               <span>📅</span>
               <span>02 June 2026, Monday</span>
             </div>
 
             {/* Notification Bell */}
-            <button className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer">
-              <span className="text-lg">🔔</span>
-              <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 rounded-full text-[9px] font-black text-white flex items-center justify-center">12</span>
+            <button className="relative p-1.5 sm:p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer">
+              <span className="text-base sm:text-lg">🔔</span>
+              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-rose-500 rounded-full text-[8px] sm:text-[9px] font-black text-white flex items-center justify-center">12</span>
             </button>
 
             {/* Profiles */}
-            <div className="flex items-center gap-2.5 border-l border-slate-200 pl-5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-bold text-slate-800">
+            <div className="flex items-center gap-2 md:border-l md:border-slate-200 md:pl-5">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-bold text-xs sm:text-sm text-slate-800 shrink-0">
                 RK
               </div>
-              <div className="flex flex-col">
+              <div className="hidden md:flex flex-col">
                 <span className="text-xs font-bold text-slate-800 leading-none">{profile.name}</span>
                 <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Regional Manager</span>
               </div>
@@ -591,7 +638,7 @@ export default function RMDashboard() {
         </header>
 
         {/* Dashboard Panels */}
-        <main className="flex-1 p-8 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-32 gap-3">
               <div className="w-10 h-10 border-4 border-amber-500/25 border-t-[#c3902c] rounded-full animate-spin" />
@@ -604,7 +651,7 @@ export default function RMDashboard() {
                ============================================================= */
             <div className="flex flex-col gap-6 animate-fadeIn">
               {/* Back Header */}
-              <div className="flex justify-between items-center bg-white p-4 border border-slate-200/80 shadow-sm rounded-2xl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 border border-slate-200/80 shadow-sm rounded-2xl gap-4">
                 <button
                   onClick={closeInspection}
                   className="flex items-center gap-2 text-sm font-bold text-amber-500 hover:text-amber-600 cursor-pointer"
@@ -613,33 +660,33 @@ export default function RMDashboard() {
                 </button>
 
                 {leadDetail.lead.current_status === 'SENT_TO_RM' && (
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start sm:justify-end">
                     <button
                       onClick={() => setActionType('reverify')}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all cursor-pointer shadow-md"
+                      className="flex-1 sm:flex-none px-3 py-2 bg-blue-600 text-white rounded-xl text-[10px] sm:text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all cursor-pointer shadow-md text-center"
                     >
-                      🔁 Request Re-Verification
+                      🔁 Re-Verify
                     </button>
                     <button
                       onClick={() => setActionType('reject')}
-                      className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 active:scale-95 transition-all cursor-pointer shadow-md"
+                      className="flex-1 sm:flex-none px-3 py-2 bg-rose-600 text-white rounded-xl text-[10px] sm:text-xs font-bold hover:bg-rose-700 active:scale-95 transition-all cursor-pointer shadow-md text-center"
                     >
-                      ❌ Reject Lead
+                      ❌ Reject
                     </button>
                     <button
                       onClick={() => setActionType('approve')}
-                      className="px-4 py-2 bg-[#c3902c] text-white rounded-xl text-xs font-bold hover:bg-amber-600 active:scale-95 transition-all cursor-pointer shadow-md"
+                      className="flex-1 sm:flex-none px-3 py-2 bg-[#c3902c] text-white rounded-xl text-[10px] sm:text-xs font-bold hover:bg-amber-600 active:scale-95 transition-all cursor-pointer shadow-md text-center"
                     >
-                      ✓ Approve Lead
+                      ✓ Approve
                     </button>
                   </div>
                 )}
 
                 {leadDetail.lead.current_status === 'RM_APPROVED' && (
-                  <div>
+                  <div className="w-full sm:w-auto flex justify-end">
                     <button
                       onClick={() => setActionType('assign')}
-                      className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-755 active:scale-95 transition-all cursor-pointer shadow-md"
+                      className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-755 active:scale-95 transition-all cursor-pointer shadow-md text-center"
                     >
                       👤 Assign Executive
                     </button>
@@ -652,7 +699,7 @@ export default function RMDashboard() {
                 
                 {/* Columns 1 & 2: Info Cards & Docs */}
                 <div className="lg:col-span-2 flex flex-col gap-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     
                     {/* Customer info */}
                     <div className="bg-white border border-slate-200/80 shadow-sm rounded-2xl p-5 flex flex-col gap-3">
@@ -749,34 +796,38 @@ export default function RMDashboard() {
                   </div>
 
                   {/* Documents Verification List */}
-                  <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 flex flex-col gap-4">
+                  <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-4 sm:p-6 flex flex-col gap-4">
                     <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Verification Documents</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       
                       {/* doc checklist */}
                       <div className="md:col-span-1 flex flex-col gap-1.5">
-                        {leadDetail.documents.length === 0 ? (
+                        {(!leadDetail.documents || leadDetail.documents.length === 0) ? (
                           <div className="text-xs text-slate-400 p-4 border border-slate-200 border-dashed rounded-xl text-center">
                             No documents attached
                           </div>
                         ) : (
-                          leadDetail.documents.map((doc) => (
-                            <button
-                              key={doc.id}
-                              onClick={() => setPreviewDoc(doc.file_url)}
-                              className={`w-full flex items-center justify-between p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                                previewDoc === doc.file_url
-                                  ? 'bg-amber-500/5 border-amber-500/35 text-amber-700'
-                                  : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
-                              }`}
-                            >
-                              <div className="flex flex-col gap-0.5 min-w-0">
-                                <span className="text-xs font-bold truncate">{doc.document_type.replace(/_/g, ' ')}</span>
-                                <span className="text-[9px] text-slate-400 font-mono">Attachment Link</span>
-                              </div>
-                              <span className="text-xs">👁️</span>
-                            </button>
-                          ))
+                          leadDetail.documents.map((doc) => {
+                            const fileUrl = doc.file_url || (doc as any).fileUrl || '#';
+                            const docType = doc.document_type || (doc as any).documentType || 'Document';
+                            return (
+                              <button
+                                key={doc.id}
+                                onClick={() => setPreviewDoc(fileUrl)}
+                                className={`w-full flex items-center justify-between p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                                  previewDoc === fileUrl
+                                    ? 'bg-amber-500/5 border-amber-500/35 text-amber-700'
+                                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
+                                }`}
+                              >
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                  <span className="text-xs font-bold truncate">{docType.replace(/_/g, ' ')}</span>
+                                  <span className="text-[9px] text-slate-400 font-mono">Attachment Link</span>
+                                </div>
+                                <span className="text-xs">👁️</span>
+                              </button>
+                            );
+                          })
                         )}
                       </div>
 
@@ -786,11 +837,30 @@ export default function RMDashboard() {
                           <div className="w-full h-full flex flex-col gap-2">
                             <div className="flex justify-between items-center text-[10px] text-slate-400 border-b border-slate-200 pb-1.5">
                               <span>Document Live View</span>
-                              <a href={previewDoc} target="_blank" rel="noreferrer" className="text-amber-500 font-bold hover:underline">
-                                Open Original file
-                              </a>
+                              <div className="flex gap-2.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenOriginal(previewDoc)}
+                                  className="text-amber-500 font-bold hover:underline cursor-pointer bg-transparent border-0 p-0"
+                                >
+                                  Open Original file
+                                </button>
+                                <span className="text-slate-350 select-none">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const activeDoc = leadDetail.documents.find(d => (d.file_url || (d as any).fileUrl) === previewDoc);
+                                    const docType = activeDoc ? (activeDoc.document_type || (activeDoc as any).documentType) : 'Document';
+                                    const fileName = `${leadDetail.lead.customer_name}_${docType}`;
+                                    downloadDocument(previewDoc, fileName);
+                                  }}
+                                  className="text-amber-500 font-bold hover:underline cursor-pointer bg-transparent border-0 p-0"
+                                >
+                                  Download File
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex-1 relative w-full h-[280px] bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center">
+                            <div className="flex-1 relative w-full h-[200px] sm:h-[280px] bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center">
                               <img
                                 src={previewDoc}
                                 alt="Document Preview"
@@ -843,7 +913,7 @@ export default function RMDashboard() {
             <div className="flex flex-col gap-8 animate-fadeIn">
               
               {/* Stat Cards Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6">
                 {[
                   { label: 'Pending Verification', val: statsData.stats.pendingVerification, tab: 'pending', border: 'border-amber-200 text-amber-600 bg-amber-50/60', dot: 'bg-amber-500 shadow-sm' },
                   { label: 'Approved Leads', val: statsData.stats.approvedLeads, tab: 'approved', border: 'border-emerald-200 text-emerald-600 bg-emerald-50/60', dot: 'bg-emerald-500 shadow-sm' },
@@ -854,14 +924,14 @@ export default function RMDashboard() {
                   <button
                     key={i}
                     onClick={() => setActiveTab(card.tab)}
-                    className={`bg-white border rounded-2xl p-5 flex flex-col gap-2.5 text-left shadow-sm hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer ${card.border}`}
+                    className={`bg-white border rounded-2xl p-3 sm:p-5 flex flex-col gap-2.5 text-left shadow-sm hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer ${card.border}`}
                   >
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block truncate">{card.label}</span>
-                      <div className={`w-2 h-2 rounded-full ${card.dot}`} />
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block truncate">{card.label}</span>
+                      <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${card.dot} shrink-0`} />
                     </div>
-                    <span className="text-3xl font-black text-slate-800 leading-none block">{String(card.val).padStart(2, '0')}</span>
-                    <span className="text-[10px] text-slate-400 font-bold group-hover:text-amber-500 transition-colors block">View Details →</span>
+                    <span className="text-xl sm:text-3xl font-black text-slate-800 leading-none block">{String(card.val).padStart(2, '0')}</span>
+                    <span className="text-[8px] sm:text-[10px] text-slate-400 font-bold group-hover:text-amber-500 transition-colors block">View Details →</span>
                   </button>
                 ))}
               </div>
@@ -870,22 +940,22 @@ export default function RMDashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* Left: Pending Table */}
-                <div className="lg:col-span-2 bg-white border border-slate-200/85 rounded-2xl p-6 flex flex-col gap-4 shadow-sm">
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div className="lg:col-span-2 bg-white border border-slate-200/85 rounded-2xl p-4 sm:p-6 flex flex-col gap-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wide">Leads for Verification</h3>
-                    <div className="flex gap-3">
+                    <div className="w-full sm:w-auto flex gap-3">
                       <input
                         type="text"
                         placeholder="Search by name, mobile or ID..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-slate-50 border border-slate-200 text-xs px-3 py-1.5 rounded-lg text-slate-600 focus:outline-none focus:border-amber-400"
+                        className="w-full sm:w-64 bg-slate-50 border border-slate-200 text-xs px-3 py-1.5 rounded-lg text-slate-650 focus:outline-none focus:border-amber-400"
                       />
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                    <table className="w-full min-w-[700px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Lead ID</th>
@@ -1104,11 +1174,11 @@ export default function RMDashboard() {
               )}
 
               {/* Lead Table Container */}
-              <div className="bg-white border border-slate-200/85 rounded-2xl p-6 shadow-sm">
-                <div className="overflow-x-auto">
+              <div className="bg-white border border-slate-200/85 rounded-2xl p-4 sm:p-6 shadow-sm">
+                <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
                   
                   {activeTab === 'pending' && (
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[800px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Lead ID</th>
@@ -1154,7 +1224,7 @@ export default function RMDashboard() {
                   )}
 
                   {activeTab === 'assignment' && (
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[800px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Lead ID</th>
@@ -1213,7 +1283,7 @@ export default function RMDashboard() {
                   )}
 
                   {activeTab === 'approved' && (
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[700px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Lead ID</th>
@@ -1244,7 +1314,7 @@ export default function RMDashboard() {
                   )}
 
                   {activeTab === 'reverify' && (
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[700px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Lead ID</th>
@@ -1275,7 +1345,7 @@ export default function RMDashboard() {
                   )}
 
                   {activeTab === 'rejected' && (
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[700px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Lead ID</th>
@@ -1306,7 +1376,7 @@ export default function RMDashboard() {
                   )}
 
                   {activeTab === 'completed' && (
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[700px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Lead ID</th>
@@ -1339,7 +1409,7 @@ export default function RMDashboard() {
                   )}
 
                   {activeTab === 'all-leads' && (
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[700px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Lead ID</th>
@@ -1368,7 +1438,7 @@ export default function RMDashboard() {
                   )}
 
                   {activeTab === 'executives-list' && (
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[600px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Executive ID</th>
@@ -1393,7 +1463,7 @@ export default function RMDashboard() {
                   )}
 
                   {activeTab === 'lead-sources' && (
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[400px] text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Source Name</th>
@@ -1451,7 +1521,7 @@ export default function RMDashboard() {
                       </div>
 
                       {/* Performance Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
                         {[
                           { label: 'Total Leads Received', val: reportsData.totalLeads },
                           { label: 'Approved Leads', val: reportsData.approvedLeads },
@@ -1460,9 +1530,9 @@ export default function RMDashboard() {
                           { label: 'Executive Assigned', val: reportsData.executiveAssigned },
                           { label: 'Approval Rate', val: `${reportsData.approvalRate}%` }
                         ].map((m, i) => (
-                          <div key={i} className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex flex-col gap-1.5 shadow-sm">
-                            <span className="text-[9px] text-slate-500 uppercase tracking-wider font-extrabold">{m.label}</span>
-                            <span className="text-xl font-black text-slate-850">{m.val}</span>
+                          <div key={i} className="bg-slate-50 border border-slate-200 p-3 sm:p-4 rounded-xl flex flex-col gap-1.5 shadow-sm">
+                            <span className="text-[8px] sm:text-[9px] text-slate-500 uppercase tracking-wider font-extrabold">{m.label}</span>
+                            <span className="text-lg sm:text-xl font-black text-slate-850">{m.val}</span>
                           </div>
                         ))}
                       </div>
@@ -1480,7 +1550,7 @@ export default function RMDashboard() {
                             const widthPercent = Math.max(5, Math.round((bar.val / maxVal) * 100));
                             return (
                               <div key={idx} className="flex items-center gap-4 text-xs font-bold">
-                                <span className="w-32 text-slate-500">{bar.name}</span>
+                                <span className="w-24 sm:w-32 text-slate-500 shrink-0 text-[11px] sm:text-xs">{bar.name}</span>
                                 <div className="flex-1 h-6 bg-slate-200 rounded-lg overflow-hidden border border-slate-300 relative">
                                   <div
                                     className={`h-full ${bar.color} rounded-r-md transition-all duration-500`}
@@ -1499,7 +1569,7 @@ export default function RMDashboard() {
                   )}
 
                   {activeTab === 'profile' && (
-                    <div className="max-w-xl bg-slate-50 border border-slate-200 rounded-2xl p-8 flex flex-col gap-6 shadow-sm">
+                    <div className="max-w-xl bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-8 flex flex-col gap-6 shadow-sm">
                       <div className="flex items-center gap-4 border-b border-slate-200 pb-6">
                         <div className="w-16 h-16 rounded-xl bg-[#c3902c]/20 border border-[#c3902c]/40 flex items-center justify-center font-bold text-2xl text-[#c3902c]">
                           {profile.name.split(' ').map((n: string) => n[0]).join('')}
@@ -1510,7 +1580,7 @@ export default function RMDashboard() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-xs font-bold">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6 text-xs font-bold">
                         <div>
                           <span className="text-slate-400 block mb-1">Employee Code</span>
                           <span className="text-slate-800 font-mono text-sm">{profile.employee_code}</span>
@@ -1531,6 +1601,10 @@ export default function RMDashboard() {
                     </div>
                   )}
 
+                  {activeTab === 'document-manager' && (
+                    <DocumentManager />
+                  )}
+
                 </div>
               </div>
             </div>
@@ -1542,8 +1616,8 @@ export default function RMDashboard() {
           ACTION MODALS / OVERLAYS
           =================================================================== */}
       {actionType && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6 animate-fadeIn">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full flex flex-col gap-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto flex flex-col gap-4 shadow-2xl relative">
             <button
               onClick={() => setActionType(null)}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-800 cursor-pointer"

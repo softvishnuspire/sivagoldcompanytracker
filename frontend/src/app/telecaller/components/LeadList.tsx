@@ -240,6 +240,11 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup,
                   </td>
                   <td className="py-4 px-6 text-center">
                     {getStatusBadge(lead.status)}
+                    {lead.status === 'RM_REVERIFICATION' && lead.reverificationRemarks && (
+                      <div className="text-[10px] text-orange-600 mt-1.5 max-w-[180px] text-center mx-auto leading-tight font-bold" title={lead.reverificationRemarks}>
+                        {lead.reverificationRemarks.replace('Re-verification requested. Reason: ', '')}
+                      </div>
+                    )}
                   </td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex items-center justify-end gap-2.5">
@@ -314,6 +319,13 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup,
                 </div>
                 {getStatusBadge(lead.status)}
               </div>
+
+              {lead.status === 'RM_REVERIFICATION' && lead.reverificationRemarks && (
+                <div className="text-[11px] text-orange-700 bg-orange-50 border border-orange-200 p-2.5 rounded-xl font-semibold leading-normal">
+                  <span className="font-extrabold text-[9px] uppercase text-orange-950 block mb-0.5">Re-verification Reason:</span>
+                  {lead.reverificationRemarks.replace('Re-verification requested. Reason: ', '')}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200/50 text-xs">
                 <div>
