@@ -121,6 +121,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
 
   // Case completion
   const [finalRemarks, setFinalRemarks] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState('');
 
   // Fund request amount
   const [requestedAmount, setRequestedAmount] = useState('');
@@ -1059,19 +1060,32 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                   <p className="text-xs text-emerald-600 font-bold leading-relaxed">
                     ✔ All images uploaded successfully. Ready for case closure.
                   </p>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Final Closure Remarks</label>
-                    <textarea 
-                      placeholder="Remarks detailing complete release and verification..."
-                      value={finalRemarks}
-                      onChange={(e) => setFinalRemarks(e.target.value)}
-                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 placeholder-slate-400 focus:outline-none focus:border-amber-500/50 focus:bg-white text-xs"
-                      rows={3}
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Final Closure Remarks</label>
+                      <textarea 
+                        placeholder="Remarks detailing complete release and verification..."
+                        value={finalRemarks}
+                        onChange={(e) => setFinalRemarks(e.target.value)}
+                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 placeholder-slate-400 focus:outline-none focus:border-amber-500/50 focus:bg-white text-xs resize-none"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Total Visit / Travel Expenses (₹)</label>
+                      <input 
+                        type="number"
+                        placeholder="e.g. 450"
+                        value={expenseAmount}
+                        onChange={(e) => setExpenseAmount(e.target.value)}
+                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 text-xs font-mono"
+                      />
+                      <span className="text-[10px] text-slate-400 block mt-1">Provide total travel/fuel/other conveyance expenses for this case closure.</span>
+                    </div>
                   </div>
                   <button 
-                    onClick={() => handleStatusChange('CASE_COMPLETED', { remarks: finalRemarks })}
-                    disabled={submitting}
+                    onClick={() => handleStatusChange('CASE_COMPLETED', { remarks: finalRemarks, expenseAmount })}
+                    disabled={submitting || expenseAmount === '' || isNaN(Number(expenseAmount)) || Number(expenseAmount) < 0}
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:brightness-110 active:scale-[0.98] text-slate-950 font-bold text-xs tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
                   >
                     <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -193,6 +193,9 @@ graph TD
   - Linked the 'Executives' register view to render real DB status and database employee codes rather than indices and hardcoded 'Active' labels. Updated the backend RM executives endpoint to fetch `employee_code`.
   - Upgraded the 'Lead Sources' tab to dynamically compute lead volume counts per source from database leads rather than hardcoding static mock listings. Added a 'Total Leads' count column to the view.
 - **MD TypeScript Compiler Fix**: Resolved an implicit `any` type compilation error (`Parameter 'd' implicitly has an 'any' type`) in the documents search callback inside [md/page.tsx](file:///c:/sivagoldcompanytracker/frontend/src/app/md/page.tsx#L1070) by explicitly annotating the parameter `d` with the type `any` (i.e. `(d: any)`).
-
-
-
+- **Executive Expenses Tracking & MD Analytics Integration**: Implemented a comprehensive executive visit expense tracking flow using the existing `audit_logs` table schema (`module = 'EXPENSE'`, `action = 'SUBMIT'`). Field Executives can enter their total visit/travel expenses (₹) during the case completion step. MDs can access the "Executive Expenses" subpage showing cumulative expenses, detailed transaction records, executive breakdowns, and Recharts-powered bar chart statistics, complete with a real-time "Refresh Data" sync action button. Additionally, integrated an "Executive Visit Expenses" details card into the MD Lead Inspection view, loading expense records directly from audit logs when inspecting individual lead cases.
+- **Executive Expenses Submission & MD Display Fix**: 
+  - Backend: Added explicit database error handling, warning logs, and positive status print logs to `/api/executive/complete-case` for audit log inserts.
+  - Backend: Permitted `expenseAmount` value to be non-negative (i.e. `>= 0`) to handle instances where zero expenses were incurred.
+  - Backend: Added custom JSON string parsing support in `GET /api/md/lead/:id` and `GET /api/md/expenses` to safely handle `new_value` payload formatting if PostgreSQL returns the JSONB column value in stringified format.
+  - Frontend: Hardened the COMPLETE CASE CLOSURE step form validation on the Field Executive portal lead details page to prevent empty/blank or invalid string expense input submissions, forcing the field executive to enter a valid non-negative number.
