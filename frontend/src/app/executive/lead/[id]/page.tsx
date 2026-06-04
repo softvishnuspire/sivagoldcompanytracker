@@ -113,6 +113,12 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
   const [balanceTx, setBalanceTx] = useState('');
   const [balanceDate, setBalanceDate] = useState('');
 
+  // Bank visit proof
+  const [bankImage, setBankImage] = useState<File | null>(null);
+
+  // Persistent bank visit proof upload (at the bottom of page details)
+  const [persistentBankImage, setPersistentBankImage] = useState<File | null>(null);
+
   // Gold images upload
   const [goldImg1, setGoldImg1] = useState<File | null>(null);
   const [goldImg2, setGoldImg2] = useState<File | null>(null);
@@ -239,6 +245,37 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
       setVerificationNotes('');
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePersistentBankImageUpload = async () => {
+    if (!persistentBankImage) {
+      setError('Please select a file to upload.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('leadId', leadId);
+      formData.append('bankImage', persistentBankImage);
+
+      await apiRequest('/executive/upload-bank-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      // Clear selection
+      setPersistentBankImage(null);
+      
+      // Reload lead details
+      await loadLeadDetails();
+      
+      alert('Bank image proof uploaded successfully!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload bank image');
     } finally {
       setSubmitting(false);
     }
@@ -759,6 +796,16 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       rows={2}
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Verification Notes</label>
+                    <textarea 
+                      placeholder="Enter verification notes or discrepancies..."
+                      value={verificationNotes}
+                      onChange={(e) => setVerificationNotes(e.target.value)}
+                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 placeholder-slate-400 focus:outline-none focus:border-amber-500/50 focus:bg-white text-xs"
+                      rows={2}
+                    />
+                  </div>
                   <button 
                     onClick={() => handleStatusChange('BANK_VISIT', { bankName, vendorName, verificationNotes })}
                     disabled={submitting || !bankName}
@@ -776,7 +823,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
               {currentStatus === 'BANK_VISIT' && (
                 <div className="space-y-4">
                   <p className="text-xs text-slate-600 font-sans leading-relaxed">
-                    Upload copies of the finalized buyout agreement and customer KYC documents.
+                    Upload copies of the finalized buyout agreement, customer KYC, and bank visit proof documents.
                   </p>
                   <div className="space-y-3">
                     <div>
@@ -813,22 +860,40 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                         className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
                       />
                     </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Bank/Shop Image (Proof of Visit)</label>
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setBankImage(file);
+                          } else {
+                            e.target.value = '';
+                            setBankImage(null);
+                          }
+                        }}
+                        className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
+                      />
+                    </div>
                   </div>
                   <button 
                     onClick={() => {
                       const formData = new FormData();
                       if (agreementCopy) formData.append('agreementCopy', agreementCopy);
                       if (kycCopy) formData.append('kycCopy', kycCopy);
-                      formData.append('remarks', `Uploaded documents: ${agreementCopy?.name || 'N/A'}, KYC: ${kycCopy?.name || 'N/A'}`);
+                      if (bankImage) formData.append('bankImage', bankImage);
+                      formData.append('remarks', `Uploaded documents: Agreement (${agreementCopy?.name || 'N/A'}), KYC (${kycCopy?.name || 'N/A'}), Bank Visit Proof (${bankImage?.name || 'N/A'})`);
                       handleStatusChange('AGREEMENT_PENDING', formData);
                     }}
-                    disabled={submitting || !agreementCopy || !kycCopy}
+                    disabled={submitting || !agreementCopy || !kycCopy || !bankImage}
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:brightness-110 active:scale-[0.98] text-slate-950 font-bold text-xs tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
                   >
                     <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-8L8 4z" />
                     </svg>
-                    UPLOAD AGREEMENTS
+                    UPLOAD AGREEMENTS & BANK PROOF
                   </button>
                 </div>
               )}
@@ -1137,7 +1202,6 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                   </button>
                 </div>
               )}
-
             </div>
           )}
 

@@ -578,7 +578,8 @@ router.post('/bank-visit', async (req, res) => {
 // 8.5 POST /api/executive/upload-agreements (Moves status to AGREEMENT_PENDING)
 router.post('/upload-agreements', upload.fields([
   { name: 'agreementCopy', maxCount: 1 },
-  { name: 'kycCopy', maxCount: 1 }
+  { name: 'kycCopy', maxCount: 1 },
+  { name: 'bankImage', maxCount: 1 }
 ]), async (req, res) => {
   const { leadId, remarks } = req.body;
   const userId = req.user.id;
@@ -596,6 +597,7 @@ router.post('/upload-agreements', upload.fields([
     const files = req.files;
     let agreementUrl = '';
     let kycUrl = '';
+    let bankImageUrl = '';
 
     if (files) {
       if (files['agreementCopy'] && files['agreementCopy'][0]) {
@@ -626,13 +628,27 @@ router.post('/upload-agreements', upload.fields([
           uploaded_by: userId
         }]);
       }
+      if (files['bankImage'] && files['bankImage'][0]) {
+        const file = files['bankImage'][0];
+        const detectedMime = validateMagicBytes(file.buffer);
+        if (!detectedMime) {
+          return res.status(400).json({ error: 'Security Alert: Invalid file content detected for bankImage.' });
+        }
+        bankImageUrl = await uploadToSupabase('loan-documents', file.originalname, file.buffer, detectedMime);
+        await supabase.from('lead_documents').insert([{
+          lead_id: leadId,
+          document_type: 'BANK_DOCUMENT',
+          file_url: bankImageUrl,
+          uploaded_by: userId
+        }]);
+      }
     }
 
     await supabase.from('leads').update({ current_status: 'AGREEMENT_PENDING', updated_at: new Date() }).eq('id', leadId);
 
-    await addTimelineRecord(leadId, 'AGREEMENT_PENDING', `Uploaded agreement and KYC documents.`, userId);
+    await addTimelineRecord(leadId, 'AGREEMENT_PENDING', `Uploaded buyout agreement, KYC, and bank visit proof documents.`, userId);
 
-    return res.json({ message: 'Agreement and KYC documents uploaded successfully.' });
+    return res.json({ message: 'Agreements, KYC, and bank visit proof uploaded successfully.' });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -942,4 +958,46 @@ router.get('/reports', async (req, res) => {
   }
 });
 
+
+// 14. POST /api/executive/upload-bank-image (Allows upload of bank proof image at any point)
+router.post('/upload-bank-image', upload.single('bankImage'), async (req, res) => {
+  const { leadId } = req.body;
+  const userId = req.user.id;
+
+  if (!leadId) {
+    return res.status(400).json({ error: 'leadId is required.' });
+  }
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+
+    const detectedMime = validateMagicBytes(req.file.buffer);
+    if (!detectedMime) {
+      return res.status(400).json({ error: 'Security Alert: Invalid file content detected for bankImage.' });
+    }
+
+    const bankImageUrl = await uploadToSupabase('loan-documents', req.file.originalname, req.file.buffer, detectedMime);
+
+    const { data: docData, error: docError } = await supabase.from('lead_documents').insert([{
+      lead_id: leadId,
+      document_type: 'BANK_DOCUMENT',
+      file_url: bankImageUrl,
+      uploaded_by: userId
+    }]).select();
+
+    if (docError) {
+      return res.status(400).json({ error: docError.message });
+    }
+
+    await addTimelineRecord(leadId, 'BANK_DOCUMENT_UPLOADED', `Uploaded bank/shop visit proof image.`, userId);
+
+    return res.json({ message: 'Bank image uploaded successfully.', document: docData[0] });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;
+
