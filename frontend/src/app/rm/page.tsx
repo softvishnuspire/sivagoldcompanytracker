@@ -79,6 +79,42 @@ interface DashboardStats {
   executiveLoad: any[];
   recentActivity: any[];
 }
+const STATUS_STEPS = [
+  { status: 'CUSTOMER_CALLED', label: 'Customer Called', icon: '📞' },
+  { status: 'VISIT_CONFIRMED', label: 'Visit Confirmed', icon: '📅' },
+  { status: 'MD_FUNDS_APPROVED', label: 'MD Funds Approved', icon: '💰' },
+  { status: 'JOURNEY_STARTED', label: 'Journey Started', icon: '🚗' },
+  { status: 'REACHED_CUSTOMER', label: 'Reached Customer', icon: '📍' },
+  { status: 'CUSTOMER_INTERACTION', label: 'Customer Interaction', icon: '🤝' },
+  { status: 'BANK_VISIT', label: 'Bank Visit', icon: '🏦' },
+  { status: 'AGREEMENT_PENDING', label: 'Agreement Pending', icon: '📄' },
+  { status: 'PAYMENT_COMPLETED', label: 'Payment Done', icon: '💳' },
+  { status: 'GOLD_RECEIVED', label: 'Receiving Gold', icon: '🏆' },
+  { status: 'BALANCE_SETTLED', label: 'Settling Balance', icon: '⚖️' },
+  { status: 'IMAGES_UPLOADED', label: 'Images Upload', icon: '📷' },
+  { status: 'CASE_COMPLETED', label: 'Case Closed', icon: '🏁' },
+];
+
+const getActiveStepIndex = (status: string): number => {
+  const normStatus = status.toUpperCase().replace(/[\s_]+/g, '_');
+  switch (normStatus) {
+    case 'EXECUTIVE_ASSIGNED': return 0;
+    case 'CUSTOMER_CALLED': return 1;
+    case 'VISIT_CONFIRMED': return 2;
+    case 'MD_FUNDS_APPROVED': return 3;
+    case 'JOURNEY_STARTED': return 4;
+    case 'REACHED_CUSTOMER': return 5;
+    case 'CUSTOMER_INTERACTION': return 6;
+    case 'BANK_VISIT': return 7;
+    case 'AGREEMENT_PENDING': return 8;
+    case 'PAYMENT_COMPLETED': return 9;
+    case 'GOLD_RECEIVED': return 10;
+    case 'BALANCE_SETTLED': return 11;
+    case 'IMAGES_UPLOADED': return 12;
+    case 'CASE_COMPLETED': return 13;
+    default: return 0;
+  }
+};
 
 export default function RMDashboard() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -987,26 +1023,91 @@ export default function RMDashboard() {
 
                 </div>
 
-                {/* Column 3: Timeline audit */}
-                <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 flex flex-col gap-5">
-                  <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Lead Timeline History</h3>
-                  <div className="flex-1 flex flex-col gap-4 relative pl-5 border-l border-slate-200 ml-2">
-                    {leadDetail.timeline.map((event) => (
-                      <div key={event.id} className="relative flex flex-col gap-1 text-xs">
-                        <div className="absolute left-[-26px] top-1 w-2.5 h-2.5 rounded-full bg-amber-500 border border-white shadow-sm" />
-                        <div className="flex justify-between items-center">
-                          <span className="font-bold text-slate-800">{event.status.replace(/_/g, ' ')}</span>
-                          <span className="text-[9px] text-slate-400 font-mono">
-                            {new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className="text-slate-500 font-medium">{event.remarks}</p>
-                        {event.user && (
-                          <span className="text-[9px] text-slate-400 font-bold">Updated By: {event.user.name}</span>
-                        )}
-                      </div>
-                    ))}
+                {/* Column 3: Timeline & Status Stepper */}
+                <div className="flex flex-col gap-6">
+                  
+                  {/* Lead Workflow Status */}
+                  <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-3">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Lead Workflow Status</h3>
+                    <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
+                      {(() => {
+                        const currentStepIdx = getActiveStepIndex(leadDetail.lead.current_status);
+                        return STATUS_STEPS.map((step, idx) => {
+                          const isCompleted = idx < currentStepIdx;
+                          const isActive = idx === currentStepIdx;
+                          const isPending = idx > currentStepIdx;
+
+                          return (
+                            <div
+                              key={step.status}
+                              className={`relative flex items-center justify-between p-2.5 rounded-xl border transition-all duration-300 ${
+                                isActive 
+                                  ? 'bg-amber-50/50 border-amber-500/40 text-amber-900 shadow-sm font-bold' 
+                                  : isCompleted 
+                                    ? 'bg-emerald-50/20 border-emerald-200/20 text-slate-600' 
+                                    : 'bg-slate-50/20 border-slate-100 text-slate-400 opacity-60'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                                  isActive 
+                                    ? 'bg-amber-500 text-white font-extrabold shadow-sm animate-pulse' 
+                                    : isCompleted 
+                                      ? 'bg-emerald-500 text-white' 
+                                      : 'bg-slate-100 text-slate-400'
+                                }`}>
+                                  {isCompleted ? '✓' : step.icon}
+                                </div>
+                                <span className={`text-[11px] ${isActive ? 'font-bold text-amber-800' : 'font-medium'}`}>
+                                  {step.label}
+                                </span>
+                              </div>
+
+                              {isActive && (
+                                <span className="flex items-center gap-1 text-[8px] font-bold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                  <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>
+                                  Active
+                                </span>
+                              )}
+                              {isCompleted && (
+                                <span className="text-[8px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                  Done
+                                </span>
+                              )}
+                              {isPending && (
+                                <span className="text-[8px] font-semibold text-slate-400 bg-slate-100/80 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
+
+                  {/* Case Timeline audit */}
+                  <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 flex flex-col gap-5 flex-1">
+                    <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Lead Timeline History</h3>
+                    <div className="flex-1 flex flex-col gap-4 relative pl-5 border-l border-slate-200 ml-2">
+                      {leadDetail.timeline.map((event) => (
+                        <div key={event.id} className="relative flex flex-col gap-1 text-xs">
+                          <div className="absolute left-[-26px] top-1 w-2.5 h-2.5 rounded-full bg-amber-500 border border-white shadow-sm" />
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-slate-800">{event.status.replace(/_/g, ' ')}</span>
+                            <span className="text-[9px] text-slate-400 font-mono">
+                              {new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-slate-500 font-medium">{event.remarks}</p>
+                          {event.user && (
+                            <span className="text-[9px] text-slate-400 font-bold">Updated By: {event.user.name}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                 </div>
 
               </div>

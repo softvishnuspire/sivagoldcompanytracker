@@ -95,6 +95,19 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
     type: 'LOAN_SLIP' | 'KYC' | 'ADDITIONAL',
     file: File
   ) => {
+    const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (!fileExt || !allowedExtensions.includes(fileExt)) {
+      alert('Invalid file type. Only PDF, JPG, JPEG, and PNG files are allowed.');
+      return;
+    }
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('File size exceeds the 10MB limit.');
+      return;
+    }
+
     // Set initial loading state
     setUploadedFiles(prev => ({
       ...prev,
@@ -718,6 +731,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                           <input
                             type="file"
                             className="hidden"
+                            accept=".pdf,.jpg,.jpeg,.png"
                             onChange={(e) => {
                               const selectedFile = e.target.files?.[0];
                               if (selectedFile) {

@@ -70,6 +70,43 @@ interface Lead {
   fund_requests?: FundRequest[];
 }
 
+const STATUS_STEPS = [
+  { status: 'CUSTOMER_CALLED', label: 'Customer Called', icon: '📞' },
+  { status: 'VISIT_CONFIRMED', label: 'Visit Confirmed', icon: '📅' },
+  { status: 'MD_FUNDS_APPROVED', label: 'MD Funds Approved', icon: '💰' },
+  { status: 'JOURNEY_STARTED', label: 'Journey Started', icon: '🚗' },
+  { status: 'REACHED_CUSTOMER', label: 'Reached Customer', icon: '📍' },
+  { status: 'CUSTOMER_INTERACTION', label: 'Customer Interaction', icon: '🤝' },
+  { status: 'BANK_VISIT', label: 'Bank Visit', icon: '🏦' },
+  { status: 'AGREEMENT_PENDING', label: 'Agreement Pending', icon: '📄' },
+  { status: 'PAYMENT_COMPLETED', label: 'Payment Done', icon: '💳' },
+  { status: 'GOLD_RECEIVED', label: 'Receiving Gold', icon: '🏆' },
+  { status: 'BALANCE_SETTLED', label: 'Settling Balance', icon: '⚖️' },
+  { status: 'IMAGES_UPLOADED', label: 'Images Upload', icon: '📷' },
+  { status: 'CASE_COMPLETED', label: 'Case Closed', icon: '🏁' },
+];
+
+const getActiveStepIndex = (status: string): number => {
+  const normStatus = status.toUpperCase().replace(/[\s_]+/g, '_');
+  switch (normStatus) {
+    case 'EXECUTIVE_ASSIGNED': return 0;
+    case 'CUSTOMER_CALLED': return 1;
+    case 'VISIT_CONFIRMED': return 2;
+    case 'MD_FUNDS_APPROVED': return 3;
+    case 'JOURNEY_STARTED': return 4;
+    case 'REACHED_CUSTOMER': return 5;
+    case 'CUSTOMER_INTERACTION': return 6;
+    case 'BANK_VISIT': return 7;
+    case 'AGREEMENT_PENDING': return 8;
+    case 'PAYMENT_COMPLETED': return 9;
+    case 'GOLD_RECEIVED': return 10;
+    case 'BALANCE_SETTLED': return 11;
+    case 'IMAGES_UPLOADED': return 12;
+    case 'CASE_COMPLETED': return 13;
+    default: return 0;
+  }
+};
+
 export default function LeadDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id: leadId } = use(params);
@@ -113,6 +150,12 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
   const [balanceTx, setBalanceTx] = useState('');
   const [balanceDate, setBalanceDate] = useState('');
 
+  // Bank visit proof
+  const [bankImage, setBankImage] = useState<File | null>(null);
+
+  // Persistent bank visit proof upload (at the bottom of page details)
+  const [persistentBankImage, setPersistentBankImage] = useState<File | null>(null);
+
   // Gold images upload
   const [goldImg1, setGoldImg1] = useState<File | null>(null);
   const [goldImg2, setGoldImg2] = useState<File | null>(null);
@@ -131,6 +174,20 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
   const [previewDocType, setPreviewDocType] = useState<string | null>(null);
   const [previewDocName, setPreviewDocName] = useState<string | null>(null);
   const [timelineCollapsed, setTimelineCollapsed] = useState(true);
+  const validateSelectedFile = (file: File | null): boolean => {
+    if (!file) return true;
+    const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (!fileExt || !allowedExtensions.includes(fileExt)) {
+      alert('Invalid file type. Only PDF, JPG, JPEG, and PNG files are allowed.');
+      return false;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size exceeds the 10MB limit.');
+      return false;
+    }
+    return true;
+  };
 
   const downloadDocument = (url: string, filename: string) => {
     const link = document.createElement('a');
@@ -231,6 +288,37 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
     }
   };
 
+  const handlePersistentBankImageUpload = async () => {
+    if (!persistentBankImage) {
+      setError('Please select a file to upload.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('leadId', leadId);
+      formData.append('bankImage', persistentBankImage);
+
+      await apiRequest('/executive/upload-bank-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      // Clear selection
+      setPersistentBankImage(null);
+      
+      // Reload lead details
+      await loadLeadDetails();
+      
+      alert('Bank image proof uploaded successfully!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload bank image');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleRequestFunds = async () => {
     if (!requestedAmount) {
       setError('Please enter a fund amount.');
@@ -250,30 +338,6 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
       await loadLeadDetails();
     } catch (err: any) {
       setError(err.message || 'Failed to submit fund request.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Simulation tool for MD Funds Approval (since executive cannot modify, we simulate it for UI walkthrough)
-  const handleSimulateFundsApproval = async () => {
-    setError('');
-    setSubmitting(true);
-    try {
-      // First make a fund request
-      const { data: requestRes } = await apiRequest('/executive/update-status', {
-        method: 'POST',
-        body: JSON.stringify({
-          leadId,
-          targetStatus: 'MD_FUNDS_APPROVED',
-          remarks: 'MD approved funds of ₹' + (lead?.loan_amount || 50000)
-        })
-      });
-
-      // Insert record in fund_requests and payments
-      await loadLeadDetails();
-    } catch (err: any) {
-      setError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -403,7 +467,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-450">Loan Account No.</span>
-                  <span className="text-slate-800 truncate max-w-[140px] font-bold">{lead.loan_account_number || 'N/A'}</span>
+                  <span className="text-slate-800 break-all font-bold">{lead.loan_account_number || 'N/A'}</span>
                 </div>
               </div>
             </div>
@@ -637,19 +701,6 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       </>
                     )}
 
-                    <div className="pt-2 border-t border-slate-100">
-                      <p className="text-[10px] text-slate-450 mb-2">Demo Simulation: Bypass wait state and approve funds</p>
-                      <button 
-                        onClick={handleSimulateFundsApproval}
-                        disabled={submitting}
-                        className="px-4 py-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-200 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
-                      >
-                        <svg className="w-3.5 h-3.5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                        SIMULATE MD FUNDS APPROVAL
-                      </button>
-                    </div>
                   </div>
                 );
               })()}
@@ -783,6 +834,16 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       rows={2}
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Verification Notes</label>
+                    <textarea 
+                      placeholder="Enter verification notes or discrepancies..."
+                      value={verificationNotes}
+                      onChange={(e) => setVerificationNotes(e.target.value)}
+                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 placeholder-slate-400 focus:outline-none focus:border-amber-500/50 focus:bg-white text-xs"
+                      rows={2}
+                    />
+                  </div>
                   <button 
                     onClick={() => handleStatusChange('BANK_VISIT', { bankName, vendorName, verificationNotes })}
                     disabled={submitting || !bankName}
@@ -800,14 +861,23 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
               {currentStatus === 'BANK_VISIT' && (
                 <div className="space-y-4">
                   <p className="text-xs text-slate-600 font-sans leading-relaxed">
-                    Upload copies of the finalized buyout agreement and customer KYC documents.
+                    Upload copies of the finalized buyout agreement, customer KYC, and bank visit proof documents.
                   </p>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Agreement Copy (PDF/Image)</label>
                       <input 
                         type="file" 
-                        onChange={(e) => setAgreementCopy(e.target.files ? e.target.files[0] : null)}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setAgreementCopy(file);
+                          } else {
+                            e.target.value = '';
+                            setAgreementCopy(null);
+                          }
+                        }}
                         className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
                       />
                     </div>
@@ -815,7 +885,33 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">KYC Copy (PDF/Image)</label>
                       <input 
                         type="file" 
-                        onChange={(e) => setKycCopy(e.target.files ? e.target.files[0] : null)}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setKycCopy(file);
+                          } else {
+                            e.target.value = '';
+                            setKycCopy(null);
+                          }
+                        }}
+                        className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Bank/Shop Image (Proof of Visit)</label>
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setBankImage(file);
+                          } else {
+                            e.target.value = '';
+                            setBankImage(null);
+                          }
+                        }}
                         className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
                       />
                     </div>
@@ -825,16 +921,17 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       const formData = new FormData();
                       if (agreementCopy) formData.append('agreementCopy', agreementCopy);
                       if (kycCopy) formData.append('kycCopy', kycCopy);
-                      formData.append('remarks', `Uploaded documents: ${agreementCopy?.name || 'N/A'}, KYC: ${kycCopy?.name || 'N/A'}`);
+                      if (bankImage) formData.append('bankImage', bankImage);
+                      formData.append('remarks', `Uploaded documents: Agreement (${agreementCopy?.name || 'N/A'}), KYC (${kycCopy?.name || 'N/A'}), Bank Visit Proof (${bankImage?.name || 'N/A'})`);
                       handleStatusChange('AGREEMENT_PENDING', formData);
                     }}
-                    disabled={submitting || !agreementCopy || !kycCopy}
+                    disabled={submitting || !agreementCopy || !kycCopy || !bankImage}
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:brightness-110 active:scale-[0.98] text-slate-950 font-bold text-xs tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
                   >
                     <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-8L8 4z" />
                     </svg>
-                    UPLOAD AGREEMENTS
+                    UPLOAD AGREEMENTS & BANK PROOF
                   </button>
                 </div>
               )}
@@ -881,7 +978,16 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Payment Proof</label>
                       <input 
                         type="file" 
-                        onChange={(e) => setPaymentProof(e.target.files ? e.target.files[0] : null)}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setPaymentProof(file);
+                          } else {
+                            e.target.value = '';
+                            setPaymentProof(null);
+                          }
+                        }}
                         className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
                       />
                     </div>
@@ -1019,19 +1125,71 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Gold Image 1</label>
-                      <input type="file" onChange={(e) => setGoldImg1(e.target.files ? e.target.files[0] : null)} className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" />
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setGoldImg1(file);
+                          } else {
+                            e.target.value = '';
+                            setGoldImg1(null);
+                          }
+                        }}
+                        className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Gold Image 2</label>
-                      <input type="file" onChange={(e) => setGoldImg2(e.target.files ? e.target.files[0] : null)} className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" />
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setGoldImg2(file);
+                          } else {
+                            e.target.value = '';
+                            setGoldImg2(null);
+                          }
+                        }}
+                        className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Gold Image 3</label>
-                      <input type="file" onChange={(e) => setGoldImg3(e.target.files ? e.target.files[0] : null)} className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" />
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setGoldImg3(file);
+                          } else {
+                            e.target.value = '';
+                            setGoldImg3(null);
+                          }
+                        }}
+                        className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Gold Image 4</label>
-                      <input type="file" onChange={(e) => setGoldImg4(e.target.files ? e.target.files[0] : null)} className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" />
+                      <input 
+                        type="file" 
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files ? e.target.files[0] : null;
+                          if (validateSelectedFile(file)) {
+                            setGoldImg4(file);
+                          } else {
+                            e.target.value = '';
+                            setGoldImg4(null);
+                          }
+                        }}
+                        className="w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:bg-amber-100 file:text-[#c3902c]" 
+                      />
                     </div>
                   </div>
                   <button 
@@ -1095,7 +1253,6 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                   </button>
                 </div>
               )}
-
             </div>
           )}
 
@@ -1172,63 +1329,64 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
           {/* Quick Actions bottom/right cards */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-4 shadow-sm">
             <h4 className="text-xs font-bold text-slate-450 tracking-wider uppercase border-b border-slate-100 pb-2">Quick Actions (Current Status)</h4>
-            <div className="space-y-2">
-              <button 
-                disabled={currentStatus !== 'EXECUTIVE_ASSIGNED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>📞 Call Customer</span>
-                {currentStatus === 'EXECUTIVE_ASSIGNED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'MD_FUNDS_APPROVED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>🚗 Start Journey</span>
-                {currentStatus === 'MD_FUNDS_APPROVED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'JOURNEY_STARTED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>📍 Reached Location</span>
-                {currentStatus === 'JOURNEY_STARTED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'CUSTOMER_INTERACTION'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>🏦 Bank Visit</span>
-                {currentStatus === 'CUSTOMER_INTERACTION' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'AGREEMENT_PENDING'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>💳 Payment Done</span>
-                {currentStatus === 'AGREEMENT_PENDING' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'PAYMENT_COMPLETED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>🏆 Gold Received</span>
-                {currentStatus === 'PAYMENT_COMPLETED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'BALANCE_SETTLED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>📷 Upload Images</span>
-                {currentStatus === 'BALANCE_SETTLED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'IMAGES_UPLOADED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>🏁 Complete Case</span>
-                {currentStatus === 'IMAGES_UPLOADED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
+            <div className="space-y-3">
+              {(() => {
+                const currentStepIdx = getActiveStepIndex(currentStatus);
+                return STATUS_STEPS.map((step, idx) => {
+                  const isCompleted = idx < currentStepIdx;
+                  const isActive = idx === currentStepIdx;
+                  const isPending = idx > currentStepIdx;
+
+                  return (
+                    <div
+                      key={step.status}
+                      className={`relative flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${
+                        isActive 
+                          ? 'bg-amber-50/50 border-amber-500/40 text-amber-900 shadow-md font-bold scale-[1.01]' 
+                          : isCompleted 
+                            ? 'bg-emerald-50/20 border-emerald-200/20 text-slate-600' 
+                            : 'bg-slate-50/20 border-slate-100 text-slate-400 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Step Indicator */}
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                          isActive 
+                            ? 'bg-amber-500 text-white font-extrabold shadow-sm animate-pulse' 
+                            : isCompleted 
+                              ? 'bg-emerald-500 text-white' 
+                              : 'bg-slate-100 text-slate-400'
+                        }`}>
+                          {isCompleted ? '✓' : step.icon}
+                        </div>
+
+                        {/* Step Label */}
+                        <span className={`text-xs ${isActive ? 'font-bold text-amber-800' : 'font-medium'}`}>
+                          {step.label}
+                        </span>
+                      </div>
+
+                      {/* Right status badge */}
+                      {isActive && (
+                        <span className="flex items-center gap-1.5 text-[9px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full uppercase tracking-wider animate-fadeIn">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                          Active
+                        </span>
+                      )}
+                      {isCompleted && (
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Done
+                        </span>
+                      )}
+                      {isPending && (
+                        <span className="text-[9px] font-semibold text-slate-400 bg-slate-100/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
 

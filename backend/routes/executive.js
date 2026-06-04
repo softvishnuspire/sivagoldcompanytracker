@@ -4,11 +4,52 @@ const multer = require('multer');
 const { supabase } = require('../db/supabase');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 
-// Setup multer in-memory file handling
+const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+
+// Setup multer in-memory file handling with validation filter
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    if (!file) {
+      return cb(null, true);
+    }
+    const mimetypeOk = allowedMimeTypes.includes(file.mimetype);
+    const extension = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+    const extensionOk = allowedExtensions.includes(extension);
+
+    if (mimetypeOk && extensionOk) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, JPG, JPEG, and PNG files are allowed.'), false);
+    }
+  }
 });
+
+// Helper: Inspect file magic bytes to verify content matches signature
+function validateMagicBytes(buffer) {
+  if (!buffer || buffer.length < 4) return null;
+  
+  // Check PDF: %PDF
+  if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) {
+    return 'application/pdf';
+  }
+  
+  // Check PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (buffer.length >= 8 &&
+      buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47 &&
+      buffer[4] === 0x0D && buffer[5] === 0x0A && buffer[6] === 0x1A && buffer[7] === 0x0A) {
+    return 'image/png';
+  }
+  
+  // Check JPEG: FF D8 FF
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+  
+  return null;
+}
 
 // Helper: Ensure Supabase storage buckets exist
 async function ensureBucket(bucketName) {
@@ -283,6 +324,7 @@ router.post('/update-status', async (req, res) => {
     await verifyAndAdvanceStatus(leadId, lead.current_status, targetStatus, userId);
 
     // If advancing to MD_FUNDS_APPROVED, ensure a fund request exists and is approved (for simulation/override)
+    let approvedAmount = null;
     if (normalizeStatus(targetStatus) === 'MD_FUNDS_APPROVED') {
       const { data: pendingReq } = await supabase
         .from('fund_requests')
@@ -292,17 +334,19 @@ router.post('/update-status', async (req, res) => {
         .maybeSingle();
 
       if (pendingReq) {
+        approvedAmount = pendingReq.requested_amount;
         await supabase
           .from('fund_requests')
           .update({
             status: 'APPROVED',
-            approved_amount: pendingReq.requested_amount,
+            approved_amount: approvedAmount,
             approved_by: userId,
             approved_at: new Date()
           })
           .eq('id', pendingReq.id);
       } else {
         const mockAmount = lead.loan_amount ? Number(lead.loan_amount) : 50000;
+        approvedAmount = mockAmount;
         await supabase
           .from('fund_requests')
           .insert([{
@@ -317,9 +361,14 @@ router.post('/update-status', async (req, res) => {
       }
     }
 
+    const leadUpdates = { current_status: targetStatus, updated_at: new Date() };
+    if (approvedAmount !== null) {
+      leadUpdates.loan_amount = Number(approvedAmount);
+    }
+
     const { error: updateErr } = await supabase
       .from('leads')
-      .update({ current_status: targetStatus, updated_at: new Date() })
+      .update(leadUpdates)
       .eq('id', leadId);
 
     if (updateErr) throw updateErr;
@@ -537,7 +586,8 @@ router.post('/bank-visit', async (req, res) => {
 // 8.5 POST /api/executive/upload-agreements (Moves status to AGREEMENT_PENDING)
 router.post('/upload-agreements', upload.fields([
   { name: 'agreementCopy', maxCount: 1 },
-  { name: 'kycCopy', maxCount: 1 }
+  { name: 'kycCopy', maxCount: 1 },
+  { name: 'bankImage', maxCount: 1 }
 ]), async (req, res) => {
   const { leadId, remarks } = req.body;
   const userId = req.user.id;
@@ -555,11 +605,16 @@ router.post('/upload-agreements', upload.fields([
     const files = req.files;
     let agreementUrl = '';
     let kycUrl = '';
+    let bankImageUrl = '';
 
     if (files) {
       if (files['agreementCopy'] && files['agreementCopy'][0]) {
         const file = files['agreementCopy'][0];
-        agreementUrl = await uploadToSupabase('agreements', file.originalname, file.buffer, file.mimetype);
+        const detectedMime = validateMagicBytes(file.buffer);
+        if (!detectedMime) {
+          return res.status(400).json({ error: 'Security Alert: Invalid file content detected for agreementCopy.' });
+        }
+        agreementUrl = await uploadToSupabase('agreements', file.originalname, file.buffer, detectedMime);
         await supabase.from('lead_documents').insert([{
           lead_id: leadId,
           document_type: 'AGREEMENT',
@@ -569,7 +624,11 @@ router.post('/upload-agreements', upload.fields([
       }
       if (files['kycCopy'] && files['kycCopy'][0]) {
         const file = files['kycCopy'][0];
-        kycUrl = await uploadToSupabase('loan-documents', file.originalname, file.buffer, file.mimetype);
+        const detectedMime = validateMagicBytes(file.buffer);
+        if (!detectedMime) {
+          return res.status(400).json({ error: 'Security Alert: Invalid file content detected for kycCopy.' });
+        }
+        kycUrl = await uploadToSupabase('loan-documents', file.originalname, file.buffer, detectedMime);
         await supabase.from('lead_documents').insert([{
           lead_id: leadId,
           document_type: 'AADHAR',
@@ -577,13 +636,27 @@ router.post('/upload-agreements', upload.fields([
           uploaded_by: userId
         }]);
       }
+      if (files['bankImage'] && files['bankImage'][0]) {
+        const file = files['bankImage'][0];
+        const detectedMime = validateMagicBytes(file.buffer);
+        if (!detectedMime) {
+          return res.status(400).json({ error: 'Security Alert: Invalid file content detected for bankImage.' });
+        }
+        bankImageUrl = await uploadToSupabase('loan-documents', file.originalname, file.buffer, detectedMime);
+        await supabase.from('lead_documents').insert([{
+          lead_id: leadId,
+          document_type: 'BANK_DOCUMENT',
+          file_url: bankImageUrl,
+          uploaded_by: userId
+        }]);
+      }
     }
 
     await supabase.from('leads').update({ current_status: 'AGREEMENT_PENDING', updated_at: new Date() }).eq('id', leadId);
 
-    await addTimelineRecord(leadId, 'AGREEMENT_PENDING', `Uploaded agreement and KYC documents.`, userId);
+    await addTimelineRecord(leadId, 'AGREEMENT_PENDING', `Uploaded buyout agreement, KYC, and bank visit proof documents.`, userId);
 
-    return res.json({ message: 'Agreement and KYC documents uploaded successfully.' });
+    return res.json({ message: 'Agreements, KYC, and bank visit proof uploaded successfully.' });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -606,7 +679,11 @@ router.post('/payment', upload.single('paymentProof'), async (req, res) => {
 
     let paymentProofUrl = '';
     if (req.file) {
-      paymentProofUrl = await uploadToSupabase('payment-proofs', req.file.originalname, req.file.buffer, req.file.mimetype);
+      const detectedMime = validateMagicBytes(req.file.buffer);
+      if (!detectedMime) {
+        return res.status(400).json({ error: 'Security Alert: Invalid file content detected for paymentProof.' });
+      }
+      paymentProofUrl = await uploadToSupabase('payment-proofs', req.file.originalname, req.file.buffer, detectedMime);
     }
 
     // Save payment details
@@ -748,18 +825,30 @@ router.post('/upload-images', upload.fields([
     const uploadPromises = [];
 
     if (files) {
+      // Validate all files first
+      for (const fieldName of ['image1', 'image2', 'image3', 'image4']) {
+        if (files[fieldName] && files[fieldName][0]) {
+          const file = files[fieldName][0];
+          const detectedMime = validateMagicBytes(file.buffer);
+          if (!detectedMime) {
+            return res.status(400).json({ error: `Security Alert: Invalid file content detected for ${fieldName}.` });
+          }
+          file.detectedMime = detectedMime;
+        }
+      }
+
       ['image1', 'image2', 'image3', 'image4'].forEach(fieldName => {
         if (files[fieldName] && files[fieldName][0]) {
           const file = files[fieldName][0];
           uploadPromises.push(
-            uploadToSupabase('gold-images', file.originalname, file.buffer, file.mimetype)
+            uploadToSupabase('gold-images', file.originalname, file.buffer, file.detectedMime)
                .then(url => {
-                return supabase.from('gold_images').insert([{
-                  lead_id: leadId,
-                  image_url: url,
-                  uploaded_by: userId
-                }]);
-              })
+                 return supabase.from('gold_images').insert([{
+                   lead_id: leadId,
+                   image_url: url,
+                   uploaded_by: userId
+                 }]);
+               })
           );
         }
       });
@@ -904,4 +993,46 @@ router.get('/reports', async (req, res) => {
   }
 });
 
+
+// 14. POST /api/executive/upload-bank-image (Allows upload of bank proof image at any point)
+router.post('/upload-bank-image', upload.single('bankImage'), async (req, res) => {
+  const { leadId } = req.body;
+  const userId = req.user.id;
+
+  if (!leadId) {
+    return res.status(400).json({ error: 'leadId is required.' });
+  }
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+
+    const detectedMime = validateMagicBytes(req.file.buffer);
+    if (!detectedMime) {
+      return res.status(400).json({ error: 'Security Alert: Invalid file content detected for bankImage.' });
+    }
+
+    const bankImageUrl = await uploadToSupabase('loan-documents', req.file.originalname, req.file.buffer, detectedMime);
+
+    const { data: docData, error: docError } = await supabase.from('lead_documents').insert([{
+      lead_id: leadId,
+      document_type: 'BANK_DOCUMENT',
+      file_url: bankImageUrl,
+      uploaded_by: userId
+    }]).select();
+
+    if (docError) {
+      return res.status(400).json({ error: docError.message });
+    }
+
+    await addTimelineRecord(leadId, 'BANK_DOCUMENT_UPLOADED', `Uploaded bank/shop visit proof image.`, userId);
+
+    return res.json({ message: 'Bank image uploaded successfully.', document: docData[0] });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;
+

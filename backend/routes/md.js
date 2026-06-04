@@ -273,11 +273,12 @@ router.post('/fund-approval', async (req, res) => {
 
     if (updateReqErr) throw updateReqErr;
 
-    // 2. Advance lead status to MD_FUNDS_APPROVED
+    // 2. Advance lead status to MD_FUNDS_APPROVED and update loan_amount
     const { error: updateLeadErr } = await supabase
       .from('leads')
       .update({
         current_status: 'MD_FUNDS_APPROVED',
+        loan_amount: Number(approvedAmount),
         updated_at: new Date().toISOString()
       })
       .eq('id', request.lead_id);
