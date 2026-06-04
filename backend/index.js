@@ -1006,7 +1006,7 @@ app.get('/api/rm/executives', authenticateToken, requireRole(['RM']), async (req
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, mobile, status')
+      .select('id, employee_code, name, mobile, status')
       .eq('role', 'EXECUTIVE')
       .eq('status', 'active');
     if (error) throw error;

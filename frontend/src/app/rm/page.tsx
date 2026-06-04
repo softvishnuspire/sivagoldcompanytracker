@@ -84,6 +84,7 @@ export default function RMDashboard() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [loading, setLoading] = useState<boolean>(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [currentDate, setCurrentDate] = useState<string>('');
   
   // Dashboard statistics & lists
   const [statsData, setStatsData] = useState<DashboardStats | null>(null);
@@ -117,7 +118,7 @@ export default function RMDashboard() {
   const [rejectReason, setRejectReason] = useState('Purity discrepancy');
   const [selectedExecutiveId, setSelectedExecutiveId] = useState('');
 
-  const [profile, setProfile] = useState<any>({ name: 'Ramesh Kumar', employee_code: 'RM001', role: 'RM', mobile: '9888888888', email: 'rm@sivagold.com' });
+  const [profile, setProfile] = useState<any>({ name: '', employee_code: '', role: 'RM', mobile: '', email: '' });
   const [reportFilter, setReportFilter] = useState<'today' | 'week' | 'month'>('month');
   const [reportsData, setReportsData] = useState<any>({ totalLeads: 0, approvedLeads: 0, rejectedLeads: 0, reVerificationLeads: 0, executiveAssigned: 0, approvalRate: 0 });
 
@@ -229,7 +230,23 @@ export default function RMDashboard() {
         const resApproved = await authenticatedFetch('http://localhost:5000/api/rm/approved-leads');
         const pending = resPending.ok ? await resPending.json() : [];
         const approved = resApproved.ok ? await resApproved.json() : [];
-        setAllLeadsList([...pending, ...approved]);
+        const combined = [...pending, ...approved];
+        setAllLeadsList(combined);
+
+        const sourceCounts: Record<string, number> = {};
+        combined.forEach(lead => {
+          const s = lead.source || 'Direct Calls';
+          sourceCounts[s] = (sourceCounts[s] || 0) + 1;
+        });
+
+        setLeadSources([
+          { id: '1', name: 'Website', status: 'Active', count: sourceCounts['Website'] || 0 },
+          { id: '2', name: 'Facebook Ads', status: 'Active', count: sourceCounts['Facebook Ads'] || 0 },
+          { id: '3', name: 'Google Ads', status: 'Active', count: sourceCounts['Google Ads'] || 0 },
+          { id: '4', name: 'Referrals', status: 'Active', count: sourceCounts['Referrals'] || 0 },
+          { id: '5', name: 'Direct Calls', status: 'Active', count: sourceCounts['Direct Calls'] || 0 },
+          { id: '6', name: 'Walk-ins', status: 'Active', count: sourceCounts['Walk-ins'] || 0 }
+        ]);
       }
     } catch (err) {
       console.error(err);
@@ -252,13 +269,25 @@ export default function RMDashboard() {
 
   const fetchLeadSources = async () => {
     try {
+      const resPending = await authenticatedFetch('http://localhost:5000/api/rm/pending-leads');
+      const resApproved = await authenticatedFetch('http://localhost:5000/api/rm/approved-leads');
+      const pending = resPending.ok ? await resPending.json() : [];
+      const approved = resApproved.ok ? await resApproved.json() : [];
+      const combined = [...pending, ...approved];
+
+      const sourceCounts: Record<string, number> = {};
+      combined.forEach(lead => {
+        const s = lead.source || 'Direct Calls';
+        sourceCounts[s] = (sourceCounts[s] || 0) + 1;
+      });
+
       setLeadSources([
-        { id: '1', name: 'Website', status: 'Active' },
-        { id: '2', name: 'Facebook Ads', status: 'Active' },
-        { id: '3', name: 'Google Ads', status: 'Active' },
-        { id: '4', name: 'Referrals', status: 'Active' },
-        { id: '5', name: 'Direct Calls', status: 'Active' },
-        { id: '6', name: 'Walk-ins', status: 'Active' }
+        { id: '1', name: 'Website', status: 'Active', count: sourceCounts['Website'] || 0 },
+        { id: '2', name: 'Facebook Ads', status: 'Active', count: sourceCounts['Facebook Ads'] || 0 },
+        { id: '3', name: 'Google Ads', status: 'Active', count: sourceCounts['Google Ads'] || 0 },
+        { id: '4', name: 'Referrals', status: 'Active', count: sourceCounts['Referrals'] || 0 },
+        { id: '5', name: 'Direct Calls', status: 'Active', count: sourceCounts['Direct Calls'] || 0 },
+        { id: '6', name: 'Walk-ins', status: 'Active', count: sourceCounts['Walk-ins'] || 0 }
       ]);
     } catch (err) {
       console.error(err);
@@ -340,6 +369,8 @@ export default function RMDashboard() {
       window.location.href = '/';
       return;
     }
+    const dateOptions: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' };
+    setCurrentDate(new Date().toLocaleDateString('en-US', dateOptions));
     loadInitialData();
   }, []);
 
@@ -494,6 +525,45 @@ export default function RMDashboard() {
     );
   };
 
+  const computeDonutSegments = () => {
+    if (!statsData || !statsData.stats) return { total: 0, segments: [] };
+    const { pendingVerification, approvedLeads, reVerificationLeads, rejectedLeads, executiveAssigned, completedCases } = statsData.stats;
+    const total = pendingVerification + approvedLeads + reVerificationLeads + rejectedLeads + executiveAssigned + completedCases;
+    if (total === 0) return { total: 0, segments: [] };
+
+    const rawSegments = [
+      { label: 'Pending', count: pendingVerification, color: '#f59e0b', bgClass: 'bg-amber-500' },
+      { label: 'Approved', count: approvedLeads, color: '#10b981', bgClass: 'bg-emerald-500' },
+      { label: 'Re-Verify', count: reVerificationLeads, color: '#3b82f6', bgClass: 'bg-blue-500' },
+      { label: 'Rejected', count: rejectedLeads, color: '#f43f5e', bgClass: 'bg-rose-500' },
+      { label: 'Assigned', count: executiveAssigned, color: '#6366f1', bgClass: 'bg-indigo-500' },
+      { label: 'Completed', count: completedCases, color: '#8b5cf6', bgClass: 'bg-purple-550' }
+    ];
+
+    let currentOffset = 100;
+    const segments = rawSegments
+      .filter(s => s.count > 0)
+      .map(s => {
+        const percentage = (s.count / total) * 100;
+        const dashArray = `${percentage.toFixed(1)} ${(100 - percentage).toFixed(1)}`;
+        const offset = currentOffset;
+        currentOffset -= percentage;
+        return {
+          label: s.label,
+          count: s.count,
+          color: s.color,
+          bgClass: s.bgClass,
+          percentage,
+          dashArray,
+          offset
+        };
+      });
+
+    return { total, segments };
+  };
+
+  const { total: donutTotal, segments: donutSegments } = computeDonutSegments();
+
   return (
     <div suppressHydrationWarning className="h-screen w-screen overflow-hidden flex bg-[#f4f5f8] text-slate-800 font-sans selection:bg-[#c3902c] selection:text-black">
       
@@ -616,7 +686,7 @@ export default function RMDashboard() {
             {/* Date display */}
             <div className="hidden lg:flex text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl items-center gap-1.5 shadow-sm">
               <span>📅</span>
-              <span>02 June 2026, Monday</span>
+              <span>{currentDate || 'Loading date...'}</span>
             </div>
 
             {/* Notification Bell */}
@@ -628,7 +698,7 @@ export default function RMDashboard() {
             {/* Profiles */}
             <div className="flex items-center gap-2 md:border-l md:border-slate-200 md:pl-5">
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-bold text-xs sm:text-sm text-slate-800 shrink-0">
-                RK
+                {profile.name ? profile.name.split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase() : 'RM'}
               </div>
               <div className="hidden md:flex flex-col">
                 <span className="text-xs font-bold text-slate-800 leading-none">{profile.name}</span>
@@ -1092,32 +1162,37 @@ export default function RMDashboard() {
                     <div className="relative w-36 h-36 flex items-center justify-center">
                       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 42 42">
                         <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#e2e8f0" strokeWidth="3" />
-                        
-                        {/* Segments calculations (Total: 67)
-                            Pending: 24 (35.8%) -> dasharray: 35.8 64.2, offset: 100
-                            Approved: 18 (26.9%) -> dasharray: 26.9 73.1, offset: 64.2
-                            Re-verify: 5 (7.5%) -> dasharray: 7.5 92.5, offset: 37.3
-                            Rejected: 3 (4.5%) -> dasharray: 4.5 95.5, offset: 29.8
-                            Assigned: 17 (25.3%) -> dasharray: 25.3 74.7, offset: 25.3
-                        */}
-                        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#f59e0b" strokeWidth="4" strokeDasharray="35.8 64.2" strokeDashoffset="100" />
-                        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#10b981" strokeWidth="4" strokeDasharray="26.9 73.1" strokeDashoffset="64.2" />
-                        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#3b82f6" strokeWidth="4" strokeDasharray="7.5 92.5" strokeDashoffset="37.3" />
-                        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#f43f5e" strokeWidth="4" strokeDasharray="4.5 95.5" strokeDashoffset="29.8" />
-                        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#6366f1" strokeWidth="4" strokeDasharray="25.3 74.7" strokeDashoffset="25.3" />
+                        {donutSegments.map((seg, idx) => (
+                          <circle
+                            key={idx}
+                            cx="21"
+                            cy="21"
+                            r="15.915"
+                            fill="transparent"
+                            stroke={seg.color}
+                            strokeWidth="4"
+                            strokeDasharray={seg.dashArray}
+                            strokeDashoffset={seg.offset}
+                          />
+                        ))}
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                        <span className="text-2xl font-black text-slate-800 leading-none">67</span>
+                        <span className="text-2xl font-black text-slate-800 leading-none">{donutTotal}</span>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">Total Leads</span>
                       </div>
                     </div>
 
                     <div className="w-full grid grid-cols-2 gap-y-2 gap-x-4 text-[10px] font-semibold text-slate-500">
-                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Pending: 24 (35.8%)</div>
-                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> Approved: 18 (26.9%)</div>
-                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" /> Re-Verify: 5 (7.5%)</div>
-                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" /> Rejected: 3 (4.5%)</div>
-                      <div className="col-span-2 flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" /> Assigned to Executives: 17 (25.3%)</div>
+                      {donutSegments.length === 0 ? (
+                        <div className="col-span-2 text-center text-slate-400 italic">No leads registered</div>
+                      ) : (
+                        donutSegments.map((seg, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5">
+                            <span className={`w-2.5 h-2.5 rounded-full ${seg.bgClass} inline-block`} />
+                            {seg.label}: {seg.count} ({seg.percentage.toFixed(1)}%)
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1128,14 +1203,20 @@ export default function RMDashboard() {
                   
                   <div className="flex-1 flex flex-col gap-3.5">
                     {[
-                      { title: 'Missing Loan Slip', count: '08' },
-                      { title: 'Unclear Documents', count: '06' },
-                      { title: 'Loan Amount Mismatch', count: '04' },
-                      { title: 'Other Issues', count: '02' }
+                      { title: 'Awaiting RM Verification', count: statsData.stats.pendingVerification, tab: 'pending' },
+                      { title: 'Returned for Re-Verification', count: statsData.stats.reVerificationLeads, tab: 'reverify' },
+                      { title: 'Rejected Lead Exceptions', count: statsData.stats.rejectedLeads, tab: 'rejected' },
+                      { title: 'Active Executive Cases', count: statsData.stats.executiveAssigned, tab: 'assignment' }
                     ].map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center p-3 bg-slate-50/60 border border-slate-200/50 rounded-xl">
-                        <span className="text-xs font-semibold text-slate-600">{item.title}</span>
-                        <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 font-extrabold text-xs flex items-center justify-center">{item.count}</span>
+                      <div
+                        key={idx}
+                        onClick={() => setActiveTab(item.tab as any)}
+                        className="flex justify-between items-center p-3 bg-slate-50/60 border border-slate-200/50 rounded-xl hover:border-amber-500/20 hover:bg-white transition-all cursor-pointer"
+                      >
+                        <span className="text-xs font-semibold text-slate-650">{item.title}</span>
+                        <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 font-extrabold text-xs flex items-center justify-center">
+                          {String(item.count).padStart(2, '0')}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -1486,11 +1567,17 @@ export default function RMDashboard() {
                       <tbody>
                         {executives.map((ex, idx) => (
                           <tr key={ex.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                            <td className="py-3 px-3 font-mono font-bold text-slate-500">EX-00{idx + 1}</td>
+                            <td className="py-3 px-3 font-mono font-bold text-slate-500">{(ex as any).employee_code || `EX-${ex.id.substring(0, 5).toUpperCase()}`}</td>
                             <td className="py-3 px-3 font-bold text-slate-800">{ex.name}</td>
                             <td className="py-3 px-3 font-mono text-slate-550">{ex.mobile}</td>
                             <td className="py-3 px-3">
-                              <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg font-bold">Active</span>
+                              <span className={`px-2 py-0.5 rounded-lg font-bold uppercase text-[10px] border ${
+                                (ex.status || '').toLowerCase() === 'active'
+                                  ? 'bg-emerald-105 text-emerald-700 border-emerald-200/60'
+                                  : 'bg-rose-105 text-rose-700 border-rose-200/60'
+                              }`}>
+                                {ex.status || 'Active'}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -1503,6 +1590,7 @@ export default function RMDashboard() {
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2.5 px-3">Source Name</th>
+                          <th className="py-2.5 px-3">Total Leads</th>
                           <th className="py-2.5 px-3">Status</th>
                         </tr>
                       </thead>
@@ -1510,6 +1598,7 @@ export default function RMDashboard() {
                         {leadSources.map((source) => (
                           <tr key={source.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                             <td className="py-3.5 px-3 font-bold text-slate-800">{source.name}</td>
+                            <td className="py-3.5 px-3 font-semibold text-slate-600">{source.count || 0}</td>
                             <td className="py-3.5 px-3">
                               <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-lg font-bold text-[10px]">{source.status}</span>
                             </td>

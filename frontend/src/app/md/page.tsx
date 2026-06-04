@@ -1067,7 +1067,7 @@ export default function MDDashboard() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const activeDoc = leadDetail.documents.find(d => (d.file_url || (d as any).fileUrl || '#') === previewDoc);
+                                    const activeDoc = leadDetail.documents.find((d: any) => (d.file_url || (d as any).fileUrl || '#') === previewDoc);
                                     const docType = activeDoc ? activeDoc.document_type : 'Document';
                                     const fileName = `${leadDetail.lead.customer_name}_${docType}`;
                                     downloadDocument(previewDoc, fileName);
