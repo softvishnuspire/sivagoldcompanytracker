@@ -73,6 +73,43 @@ interface Lead {
   fund_requests?: FundRequest[];
 }
 
+const STATUS_STEPS = [
+  { status: 'CUSTOMER_CALLED', label: 'Customer Called', icon: '📞' },
+  { status: 'VISIT_CONFIRMED', label: 'Visit Confirmed', icon: '📅' },
+  { status: 'MD_FUNDS_APPROVED', label: 'MD Funds Approved', icon: '💰' },
+  { status: 'JOURNEY_STARTED', label: 'Journey Started', icon: '🚗' },
+  { status: 'REACHED_CUSTOMER', label: 'Reached Customer', icon: '📍' },
+  { status: 'CUSTOMER_INTERACTION', label: 'Customer Interaction', icon: '🤝' },
+  { status: 'BANK_VISIT', label: 'Bank Visit', icon: '🏦' },
+  { status: 'AGREEMENT_PENDING', label: 'Agreement Pending', icon: '📄' },
+  { status: 'PAYMENT_COMPLETED', label: 'Payment Done', icon: '💳' },
+  { status: 'GOLD_RECEIVED', label: 'Receiving Gold', icon: '🏆' },
+  { status: 'BALANCE_SETTLED', label: 'Settling Balance', icon: '⚖️' },
+  { status: 'IMAGES_UPLOADED', label: 'Images Upload', icon: '📷' },
+  { status: 'CASE_COMPLETED', label: 'Case Closed', icon: '🏁' },
+];
+
+const getActiveStepIndex = (status: string): number => {
+  const normStatus = status.toUpperCase().replace(/[\s_]+/g, '_');
+  switch (normStatus) {
+    case 'EXECUTIVE_ASSIGNED': return 0;
+    case 'CUSTOMER_CALLED': return 1;
+    case 'VISIT_CONFIRMED': return 2;
+    case 'MD_FUNDS_APPROVED': return 3;
+    case 'JOURNEY_STARTED': return 4;
+    case 'REACHED_CUSTOMER': return 5;
+    case 'CUSTOMER_INTERACTION': return 6;
+    case 'BANK_VISIT': return 7;
+    case 'AGREEMENT_PENDING': return 8;
+    case 'PAYMENT_COMPLETED': return 9;
+    case 'GOLD_RECEIVED': return 10;
+    case 'BALANCE_SETTLED': return 11;
+    case 'IMAGES_UPLOADED': return 12;
+    case 'CASE_COMPLETED': return 13;
+    default: return 0;
+  }
+};
+
 export default function LeadDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id: leadId } = use(params);
@@ -131,6 +168,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
 
   // Case completion
   const [finalRemarks, setFinalRemarks] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState('');
 
   // Fund request amount
   const [requestedAmount, setRequestedAmount] = useState('');
@@ -1252,19 +1290,32 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                   <p className="text-xs text-emerald-600 font-bold leading-relaxed">
                     ✔ All images uploaded successfully. Ready for case closure.
                   </p>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Final Closure Remarks</label>
-                    <textarea 
-                      placeholder="Remarks detailing complete release and verification..."
-                      value={finalRemarks}
-                      onChange={(e) => setFinalRemarks(e.target.value)}
-                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 placeholder-slate-400 focus:outline-none focus:border-amber-500/50 focus:bg-white text-xs"
-                      rows={3}
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Final Closure Remarks</label>
+                      <textarea 
+                        placeholder="Remarks detailing complete release and verification..."
+                        value={finalRemarks}
+                        onChange={(e) => setFinalRemarks(e.target.value)}
+                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 placeholder-slate-400 focus:outline-none focus:border-amber-500/50 focus:bg-white text-xs resize-none"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Total Visit / Travel Expenses (₹)</label>
+                      <input 
+                        type="number"
+                        placeholder="e.g. 450"
+                        value={expenseAmount}
+                        onChange={(e) => setExpenseAmount(e.target.value)}
+                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 text-xs font-mono"
+                      />
+                      <span className="text-[10px] text-slate-400 block mt-1">Provide total travel/fuel/other conveyance expenses for this case closure.</span>
+                    </div>
                   </div>
                   <button 
-                    onClick={() => handleStatusChange('CASE_COMPLETED', { remarks: finalRemarks })}
-                    disabled={submitting}
+                    onClick={() => handleStatusChange('CASE_COMPLETED', { remarks: finalRemarks, expenseAmount })}
+                    disabled={submitting || expenseAmount === '' || isNaN(Number(expenseAmount)) || Number(expenseAmount) < 0}
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:brightness-110 active:scale-[0.98] text-slate-950 font-bold text-xs tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
                   >
                     <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1367,63 +1418,64 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
           {/* Quick Actions bottom/right cards */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-4 shadow-sm">
             <h4 className="text-xs font-bold text-slate-450 tracking-wider uppercase border-b border-slate-100 pb-2">Quick Actions (Current Status)</h4>
-            <div className="space-y-2">
-              <button 
-                disabled={currentStatus !== 'EXECUTIVE_ASSIGNED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>📞 Call Customer</span>
-                {currentStatus === 'EXECUTIVE_ASSIGNED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'MD_FUNDS_APPROVED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>🚗 Start Journey</span>
-                {currentStatus === 'MD_FUNDS_APPROVED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'JOURNEY_STARTED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>📍 Reached Location</span>
-                {currentStatus === 'JOURNEY_STARTED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'CUSTOMER_INTERACTION'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>🏦 Bank Visit</span>
-                {currentStatus === 'CUSTOMER_INTERACTION' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'AGREEMENT_PENDING'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>💳 Payment Done</span>
-                {currentStatus === 'AGREEMENT_PENDING' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'PAYMENT_COMPLETED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>🏆 Gold Received</span>
-                {currentStatus === 'PAYMENT_COMPLETED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'BALANCE_SETTLED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>📷 Upload Images</span>
-                {currentStatus === 'BALANCE_SETTLED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
-              <button 
-                disabled={currentStatus !== 'IMAGES_UPLOADED'}
-                className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-semibold hover:border-amber-500/40 hover:bg-amber-500/5 transition-all text-left px-4 flex justify-between items-center text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-slate-200"
-              >
-                <span>🏁 Complete Case</span>
-                {currentStatus === 'IMAGES_UPLOADED' && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
-              </button>
+            <div className="space-y-3">
+              {(() => {
+                const currentStepIdx = getActiveStepIndex(currentStatus);
+                return STATUS_STEPS.map((step, idx) => {
+                  const isCompleted = idx < currentStepIdx;
+                  const isActive = idx === currentStepIdx;
+                  const isPending = idx > currentStepIdx;
+
+                  return (
+                    <div
+                      key={step.status}
+                      className={`relative flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${
+                        isActive 
+                          ? 'bg-amber-50/50 border-amber-500/40 text-amber-900 shadow-md font-bold scale-[1.01]' 
+                          : isCompleted 
+                            ? 'bg-emerald-50/20 border-emerald-200/20 text-slate-600' 
+                            : 'bg-slate-50/20 border-slate-100 text-slate-400 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Step Indicator */}
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                          isActive 
+                            ? 'bg-amber-500 text-white font-extrabold shadow-sm animate-pulse' 
+                            : isCompleted 
+                              ? 'bg-emerald-500 text-white' 
+                              : 'bg-slate-100 text-slate-400'
+                        }`}>
+                          {isCompleted ? '✓' : step.icon}
+                        </div>
+
+                        {/* Step Label */}
+                        <span className={`text-xs ${isActive ? 'font-bold text-amber-800' : 'font-medium'}`}>
+                          {step.label}
+                        </span>
+                      </div>
+
+                      {/* Right status badge */}
+                      {isActive && (
+                        <span className="flex items-center gap-1.5 text-[9px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full uppercase tracking-wider animate-fadeIn">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                          Active
+                        </span>
+                      )}
+                      {isCompleted && (
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Done
+                        </span>
+                      )}
+                      {isPending && (
+                        <span className="text-[9px] font-semibold text-slate-400 bg-slate-100/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
 

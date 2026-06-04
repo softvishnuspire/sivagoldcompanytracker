@@ -151,13 +151,63 @@ router.get('/lead/:id', async (req, res) => {
 
     if (imgError) throw imgError;
 
+    const { data: expenseLogs, error: expenseError } = await supabase
+      .from('audit_logs')
+      .select('id, user_id, created_at, new_value, users:user_id ( name )')
+      .eq('module', 'EXPENSE')
+      .eq('action', 'SUBMIT');
+
+    if (expenseError) {
+      console.error(`[GET /api/md/lead/${id}] expenseLogs fetch error:`, expenseError.message);
+    }
+
+    console.log(`[GET /api/md/lead/${id}] Total expense logs fetched:`, expenseLogs ? expenseLogs.length : 0);
+
+    const leadExpense = expenseLogs 
+      ? expenseLogs.find(log => {
+          let payload = log.new_value;
+          if (typeof payload === 'string') {
+            try {
+              payload = JSON.parse(payload);
+            } catch (e) {
+              payload = {};
+            }
+          }
+          const logLeadId = payload?.lead_id;
+          return logLeadId && String(logLeadId).toLowerCase() === String(id).toLowerCase();
+        })
+      : null;
+
+    let parsedPayload = {};
+    if (leadExpense) {
+      parsedPayload = leadExpense.new_value;
+      if (typeof parsedPayload === 'string') {
+        try {
+          parsedPayload = JSON.parse(parsedPayload);
+        } catch (e) {
+          parsedPayload = {};
+        }
+      }
+      console.log(`[GET /api/md/lead/${id}] Found matching expense:`, parsedPayload);
+    } else {
+      console.log(`[GET /api/md/lead/${id}] No matching expense found in logs`);
+    }
+
+    const formattedExpense = leadExpense ? {
+      amount: Number(parsedPayload?.amount || 0),
+      remarks: parsedPayload?.remarks || '',
+      submitted_by: leadExpense.users?.name || 'Field Executive',
+      created_at: leadExpense.created_at
+    } : null;
+
     res.json({
       lead,
       documents: documents || [],
       timeline: timeline || [],
       payments: payments || [],
       goldCollectionDetails: goldCollection || [],
-      goldImages: goldImages || []
+      goldImages: goldImages || [],
+      expense: formattedExpense
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1079,6 +1129,100 @@ router.get('/reports/export/pdf', async (req, res) => {
     }
 
     doc.end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 30. GET /api/md/expenses (Retrieves all executive expenses and analytics)
+router.get('/expenses', async (req, res) => {
+  try {
+    const { data: logs, error } = await supabase
+      .from('audit_logs')
+      .select(`
+        id,
+        user_id,
+        created_at,
+        new_value,
+        users:user_id ( name, employee_code )
+      `)
+      .eq('module', 'EXPENSE')
+      .eq('action', 'SUBMIT')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const leadIds = logs
+      .map(log => log.new_value?.lead_id)
+      .filter(id => !!id);
+
+    let leadsMap = {};
+    if (leadIds.length > 0) {
+      const { data: leads, error: leadsErr } = await supabase
+        .from('leads')
+        .select('id, lead_number, customer_name')
+        .in('id', leadIds);
+      if (leadsErr) throw leadsErr;
+      
+      leads.forEach(l => {
+        leadsMap[l.id] = l;
+      });
+    }
+
+    let totalExpenses = 0;
+    const executiveSummary = {};
+
+    const formattedLogs = logs.map(log => {
+      let payload = log.new_value || {};
+      if (typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload);
+        } catch (e) {
+          payload = {};
+        }
+      }
+      const amount = Number(payload.amount || 0);
+      const leadId = payload.lead_id;
+      const lead = leadsMap[leadId] || { lead_number: 'N/A', customer_name: 'N/A' };
+      const execName = log.users?.name || 'Unknown Executive';
+      const execCode = log.users?.employee_code || 'EX-N/A';
+
+      totalExpenses += amount;
+
+      if (log.user_id) {
+        if (!executiveSummary[log.user_id]) {
+          executiveSummary[log.user_id] = {
+            id: log.user_id,
+            name: execName,
+            employee_code: execCode,
+            totalAmount: 0,
+            count: 0
+          };
+        }
+        executiveSummary[log.user_id].totalAmount += amount;
+        executiveSummary[log.user_id].count += 1;
+      }
+
+      return {
+        id: log.id,
+        executive_id: log.user_id,
+        executive_name: execName,
+        executive_code: execCode,
+        lead_id: leadId,
+        lead_number: lead.lead_number,
+        customer_name: lead.customer_name,
+        amount,
+        remarks: payload.remarks || 'No remarks provided',
+        created_at: log.created_at
+      };
+    });
+
+    res.json({
+      totalExpenses,
+      executiveSummary: Object.values(executiveSummary),
+      logs: formattedLogs
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

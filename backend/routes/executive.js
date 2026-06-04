@@ -872,7 +872,8 @@ router.post('/upload-images', upload.fields([
 
 // 13. POST /api/executive/complete-case (Moves status to CASE_COMPLETED)
 router.post('/complete-case', async (req, res) => {
-  const { leadId, remarks } = req.body;
+  console.log('[POST /complete-case] req.body:', req.body);
+  const { leadId, remarks, expenseAmount } = req.body;
   const userId = req.user.id;
 
   try {
@@ -888,6 +889,32 @@ router.post('/complete-case', async (req, res) => {
       .neq('status', 'completed');
 
     await supabase.from('leads').update({ current_status: 'CASE_COMPLETED', updated_at: new Date() }).eq('id', leadId);
+
+    // If an expense amount is provided and is a valid number >= 0, log it in audit_logs
+    if (expenseAmount !== undefined && expenseAmount !== null && expenseAmount !== '') {
+      const amountNum = Number(expenseAmount);
+      if (!isNaN(amountNum) && amountNum >= 0) {
+        const { error: insertErr } = await supabase.from('audit_logs').insert([{
+          user_id: userId,
+          module: 'EXPENSE',
+          action: 'SUBMIT',
+          new_value: {
+            lead_id: leadId,
+            amount: amountNum,
+            remarks: remarks || 'Case completed visit expenses'
+          }
+        }]);
+        if (insertErr) {
+          console.error('[POST /complete-case] audit_logs insert failed:', insertErr.message);
+        } else {
+          console.log('[POST /complete-case] audit_logs insert successful:', amountNum);
+        }
+      } else {
+        console.warn('[POST /complete-case] expenseAmount is not a valid number >= 0:', expenseAmount);
+      }
+    } else {
+      console.log('[POST /complete-case] expenseAmount is empty or undefined:', expenseAmount);
+    }
 
     await addTimelineRecord(leadId, 'CASE_COMPLETED', remarks || 'Case completed successfully.', userId);
 

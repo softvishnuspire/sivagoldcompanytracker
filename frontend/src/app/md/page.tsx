@@ -132,6 +132,42 @@ interface DashboardStats {
   revenueToday: number;
   conversionRate: number;
 }
+const STATUS_STEPS = [
+  { status: 'CUSTOMER_CALLED', label: 'Customer Called', icon: '📞' },
+  { status: 'VISIT_CONFIRMED', label: 'Visit Confirmed', icon: '📅' },
+  { status: 'MD_FUNDS_APPROVED', label: 'MD Funds Approved', icon: '💰' },
+  { status: 'JOURNEY_STARTED', label: 'Journey Started', icon: '🚗' },
+  { status: 'REACHED_CUSTOMER', label: 'Reached Customer', icon: '📍' },
+  { status: 'CUSTOMER_INTERACTION', label: 'Customer Interaction', icon: '🤝' },
+  { status: 'BANK_VISIT', label: 'Bank Visit', icon: '🏦' },
+  { status: 'AGREEMENT_PENDING', label: 'Agreement Pending', icon: '📄' },
+  { status: 'PAYMENT_COMPLETED', label: 'Payment Done', icon: '💳' },
+  { status: 'GOLD_RECEIVED', label: 'Receiving Gold', icon: '🏆' },
+  { status: 'BALANCE_SETTLED', label: 'Settling Balance', icon: '⚖️' },
+  { status: 'IMAGES_UPLOADED', label: 'Images Upload', icon: '📷' },
+  { status: 'CASE_COMPLETED', label: 'Case Closed', icon: '🏁' },
+];
+
+const getActiveStepIndex = (status: string): number => {
+  const normStatus = status.toUpperCase().replace(/[\s_]+/g, '_');
+  switch (normStatus) {
+    case 'EXECUTIVE_ASSIGNED': return 0;
+    case 'CUSTOMER_CALLED': return 1;
+    case 'VISIT_CONFIRMED': return 2;
+    case 'MD_FUNDS_APPROVED': return 3;
+    case 'JOURNEY_STARTED': return 4;
+    case 'REACHED_CUSTOMER': return 5;
+    case 'CUSTOMER_INTERACTION': return 6;
+    case 'BANK_VISIT': return 7;
+    case 'AGREEMENT_PENDING': return 8;
+    case 'PAYMENT_COMPLETED': return 9;
+    case 'GOLD_RECEIVED': return 10;
+    case 'BALANCE_SETTLED': return 11;
+    case 'IMAGES_UPLOADED': return 12;
+    case 'CASE_COMPLETED': return 13;
+    default: return 0;
+  }
+};
 
 export default function MDDashboard() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -152,6 +188,7 @@ export default function MDDashboard() {
   const [empPerformance, setEmpPerformance] = useState<any>({ telecaller: [], rm: [], executive: [] });
   const [branchPerformance, setBranchPerformance] = useState<any[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+  const [expenseData, setExpenseData] = useState<any>({ totalExpenses: 0, executiveSummary: [], logs: [] });
 
   // Search, filters, inputs
   const [leadsSearch, setLeadsSearch] = useState('');
@@ -303,6 +340,21 @@ export default function MDDashboard() {
     }
   };
 
+  const fetchExpenseData = async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/md/expenses');
+      if (res.ok) {
+        const data = await res.json();
+        setExpenseData(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  };
+
   const fetchEmpPerformance = async (quiet = false) => {
     if (!quiet) setLoading(true);
     try {
@@ -343,7 +395,8 @@ export default function MDDashboard() {
         fetchRevenueData(true),
         fetchGoldData(true),
         fetchEmpPerformance(true),
-        fetchBranchPerformance(true)
+        fetchBranchPerformance(true),
+        fetchExpenseData(true)
       ]);
     } catch (err) {
       console.error('Error loading dashboard data:', err);
@@ -431,6 +484,8 @@ export default function MDDashboard() {
       fetchBranchPerformance();
     } else if (activeTab === 'timeline') {
       fetchTimeline();
+    } else if (activeTab === 'expenses') {
+      fetchExpenseData();
     } else if (activeTab === 'document-manager') {
       setLoading(false);
     }
@@ -818,6 +873,7 @@ export default function MDDashboard() {
             { id: 'employees', label: 'Employee Performance', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
             { id: 'branches', label: 'Branch Performance', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
             { id: 'timeline', label: 'Case Timeline', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+            { id: 'expenses', label: 'Executive Expenses', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
             { id: 'document-manager', label: 'Document Manager', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
             { id: 'reports', label: 'Reports', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' }
           ].map((item) => (
@@ -1180,6 +1236,27 @@ export default function MDDashboard() {
                     )}
                   </div>
 
+                  {/* Executive Visit Expenses */}
+                  <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-3">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Executive Visit Expenses</h3>
+                    {leadDetail.expense ? (
+                      <div className="text-xs border border-slate-100 p-3 rounded-xl bg-slate-50/50 flex flex-col gap-1.5 animate-fadeIn">
+                        <div className="flex justify-between font-bold">
+                          <span>Expense Amount:</span>
+                          <span className="text-[#c3902c] font-extrabold text-sm">₹{Number(leadDetail.expense.amount).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium mt-1">
+                          Remarks: <span className="text-slate-700">{leadDetail.expense.remarks}</span>
+                        </div>
+                        <div className="text-[9px] text-slate-400 font-mono mt-1">
+                          By: {leadDetail.expense.submitted_by} | {new Date(leadDetail.expense.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">No expenses submitted for this visit.</span>
+                    )}
+                  </div>
+
                   {/* Gold Collections list */}
                   <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-3">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Gold Collection details</h3>
@@ -1209,6 +1286,66 @@ export default function MDDashboard() {
                     ) : (
                       <span className="text-xs text-slate-400 italic">No gold ornament collections recorded yet.</span>
                     )}
+                  </div>
+
+                  {/* Lead Workflow Status */}
+                  <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-3">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Lead Workflow Status</h3>
+                    <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
+                      {(() => {
+                        const currentStepIdx = getActiveStepIndex(leadDetail.lead.current_status);
+                        return STATUS_STEPS.map((step, idx) => {
+                          const isCompleted = idx < currentStepIdx;
+                          const isActive = idx === currentStepIdx;
+                          const isPending = idx > currentStepIdx;
+
+                          return (
+                            <div
+                              key={step.status}
+                              className={`relative flex items-center justify-between p-2.5 rounded-xl border transition-all duration-300 ${
+                                isActive 
+                                  ? 'bg-amber-50/50 border-amber-500/40 text-amber-900 shadow-sm font-bold' 
+                                  : isCompleted 
+                                    ? 'bg-emerald-50/20 border-emerald-200/20 text-slate-600' 
+                                    : 'bg-slate-50/20 border-slate-100 text-slate-400 opacity-60'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                                  isActive 
+                                    ? 'bg-amber-500 text-white font-extrabold shadow-sm animate-pulse' 
+                                    : isCompleted 
+                                      ? 'bg-emerald-500 text-white' 
+                                      : 'bg-slate-100 text-slate-400'
+                                }`}>
+                                  {isCompleted ? '✓' : step.icon}
+                                </div>
+                                <span className={`text-[11px] ${isActive ? 'font-bold text-amber-800' : 'font-medium'}`}>
+                                  {step.label}
+                                </span>
+                              </div>
+
+                              {isActive && (
+                                <span className="flex items-center gap-1 text-[8px] font-bold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                  <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>
+                                  Active
+                                </span>
+                              )}
+                              {isCompleted && (
+                                <span className="text-[8px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                  Done
+                                </span>
+                              )}
+                              {isPending && (
+                                <span className="text-[8px] font-semibold text-slate-400 bg-slate-100/80 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
 
                   {/* Case Timeline logs */}
@@ -2138,8 +2275,148 @@ export default function MDDashboard() {
                       </button>
                   </div>
                 </div>
-              </div>
-            )}
+                </div>
+              )}
+
+              {/* 9.5 EXECUTIVE EXPENSES PAGE */}
+              {activeTab === 'expenses' && (
+                <div className="flex flex-col gap-8 animate-fadeIn">
+                  
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Executive Expenses Tracker</h3>
+                    <button
+                      onClick={() => fetchExpenseData()}
+                      className="px-3 py-1.5 bg-[#4d0711] text-amber-500 rounded-lg text-[10px] font-bold hover:bg-[#2e040a] transition-all cursor-pointer shadow-sm flex items-center gap-1"
+                    >
+                      🔄 Refresh Data
+                    </button>
+                  </div>
+
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="bg-white border border-slate-200 shadow-sm rounded-3xl p-6 flex items-center justify-between">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Executive Expenses</span>
+                        <span className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">₹{Number(expenseData.totalExpenses || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-bold text-lg text-[#c3902c]">
+                        ₹
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white border border-slate-200 shadow-sm rounded-3xl p-6 flex items-center justify-between">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Average Expense per Case</span>
+                        <span className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
+                          ₹{expenseData.logs?.length > 0 
+                            ? Math.round(Number(expenseData.totalExpenses || 0) / expenseData.logs.length).toLocaleString('en-IN')
+                            : '0'}
+                        </span>
+                      </div>
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center font-bold text-lg text-indigo-650">
+                        📈
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    {/* Left: Summary Table */}
+                    <div className="lg:col-span-2 bg-white border border-slate-200 shadow-sm rounded-3xl p-6 flex flex-col gap-4">
+                      <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider border-b border-slate-100 pb-3">Expenses by Executive</h3>
+                      <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                        <table className="w-full min-w-[500px] border-collapse text-left text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
+                              <th className="p-4">Employee Code</th>
+                              <th className="p-4">Executive Name</th>
+                              <th className="p-4">Cases Closed</th>
+                              <th className="p-4">Total Expenses</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {expenseData.executiveSummary?.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="p-8 text-center text-slate-400 italic">No executive expenses logged yet.</td>
+                              </tr>
+                            ) : (
+                              expenseData.executiveSummary?.map((summary: any, i: number) => (
+                                <tr key={i} className="hover:bg-slate-50/50">
+                                  <td className="p-4 font-mono font-bold text-slate-550">{summary.employee_code}</td>
+                                  <td className="p-4 font-bold text-slate-800">{summary.name}</td>
+                                  <td className="p-4 font-semibold text-slate-655">{summary.count}</td>
+                                  <td className="p-4 font-extrabold text-[#c3902c]">₹{Number(summary.totalAmount || 0).toLocaleString('en-IN')}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Right: Recharts Bar Chart */}
+                    <div className="bg-white border border-slate-200 shadow-sm rounded-3xl p-6 flex flex-col gap-4">
+                      <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider border-b border-slate-100 pb-3">Expense Breakdown</h3>
+                      <div className="h-64 w-full flex items-center justify-center">
+                        {expenseData.executiveSummary?.length === 0 ? (
+                          <span className="text-xs text-slate-400 italic">No chart data available</span>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={expenseData.executiveSummary}>
+                              <XAxis dataKey="name" stroke="#88868A" fontSize={10} tickLine={false} />
+                              <YAxis stroke="#88868A" fontSize={10} tickLine={false} axisLine={false} />
+                              <Tooltip 
+                                formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Expenses']}
+                                contentStyle={{ background: '#3D1510', border: '1px solid #65483B', borderRadius: '12px', color: '#D9D9DA', fontSize: '11px' }}
+                              />
+                              <Bar dataKey="totalAmount" fill="#c3902c" radius={[8, 8, 0, 0]} barSize={24} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Expense Transaction History logs */}
+                  <div className="bg-white border border-slate-200 shadow-sm rounded-3xl p-6">
+                    <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider border-b border-slate-100 pb-3 mb-4">Detailed Expense Log</h3>
+                    <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full min-w-[800px] border-collapse text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
+                            <th className="p-4">Date</th>
+                            <th className="p-4">Executive Name</th>
+                            <th className="p-4">Lead Number</th>
+                            <th className="p-4">Customer Name</th>
+                            <th className="p-4">Expense Amount</th>
+                            <th className="p-4">Remarks / Description</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {expenseData.logs?.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="p-8 text-center text-slate-400 italic">No expense entries found.</td>
+                            </tr>
+                          ) : (
+                            expenseData.logs?.map((log: any) => (
+                              <tr key={log.id} className="hover:bg-slate-50/50">
+                                <td className="p-4 text-slate-400 font-mono">{new Date(log.created_at).toLocaleDateString()}</td>
+                                <td className="p-4 font-bold text-slate-800">{log.executive_name} <span className="text-[10px] text-slate-400">({log.executive_code})</span></td>
+                                <td className="p-4 font-mono font-bold text-[#4d0711]">{log.lead_number}</td>
+                                <td className="p-4 font-semibold text-slate-655">{log.customer_name}</td>
+                                <td className="p-4 font-black text-slate-800">₹{Number(log.amount).toLocaleString('en-IN')}</td>
+                                <td className="p-4 text-slate-600 font-medium">{log.remarks}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                </div>
+              )}
 
             {activeTab === 'document-manager' && (
               <DocumentManager />
