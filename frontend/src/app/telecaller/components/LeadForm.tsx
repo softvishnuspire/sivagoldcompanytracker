@@ -29,7 +29,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
     address: '',
     district: 'Vijayawada',
     goldWeight: '',
-    goldType: 'Jewelry (22K)',
+    goldType: '22K',
     estimatedValue: '',
     bankName: '',
     branchName: '',
@@ -48,6 +48,40 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formStatus, setFormStatus] = useState<"Not Started" | "In Progress" | "Saved" | "Submitted">("Not Started");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const selectedGoldTypes = formData.goldType
+    ? formData.goldType.split(', ').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  const handleGoldTypeToggle = (purity: string) => {
+    let current = formData.goldType
+      ? formData.goldType.split(', ').map(s => s.trim()).filter(Boolean)
+      : [];
+    
+    if (current.includes(purity)) {
+      current = current.filter(t => t !== purity);
+    } else {
+      current = [...current, purity];
+    }
+    
+    const order = ['24K', '22K', '20K', '18K'];
+    current.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+
+    const updatedGoldType = current.join(', ');
+    setFormData(prev => ({ ...prev, goldType: updatedGoldType }));
+    
+    if (formStatus === "Not Started") {
+      setFormStatus("In Progress");
+    }
+
+    if (errors.goldType) {
+      setErrors(prev => {
+        const copy = { ...prev };
+        delete copy.goldType;
+        return copy;
+      });
+    }
+  };
 
   useEffect(() => {
     if (editingLead) {
@@ -124,6 +158,9 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
       const val = parseFloat(formData.estimatedValue);
       if (isNaN(val) || val <= 0) {
         stepErrors.estimatedValue = 'Estimated value must be a positive number';
+      }
+      if (!formData.goldType || formData.goldType.trim() === '') {
+        stepErrors.goldType = 'At least one gold purity must be selected';
       }
     }
 
@@ -226,7 +263,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         address: formData.address.trim(),
         district: formData.district,
         goldWeight: parseFloat(formData.goldWeight) || 0,
-        goldType: formData.goldType || 'Jewelry (22K)',
+        goldType: formData.goldType || '22K',
         estimatedValue: parseFloat(formData.estimatedValue) || 0,
         bankName: formData.bankName.trim() || '',
         branchName: formData.branchName.trim() || '',
@@ -526,24 +563,6 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">
-                  Gold Type / Purity *
-                </label>
-                <select
-                  name="goldType"
-                  disabled={isSubmitting}
-                  value={formData.goldType}
-                  onChange={handleInputChange}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 disabled:opacity-60"
-                >
-                  <option value="Jewelry (22K)">Jewelry (22K)</option>
-                  <option value="Gold Coins (24K)">Gold Coins (24K)</option>
-                  <option value="Ornaments (20K-22K)">Ornaments (20K-22K)</option>
-                  <option value="Mixed Scrap (18K)">Mixed Scrap (18K)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">
                   Estimated Value (₹) *
                 </label>
                 <input
@@ -560,6 +579,36 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 {errors.estimatedValue && (
                   <span className="flex items-center gap-1 mt-1 text-xs text-rose-500">
                     <AlertCircle size={12} /> {errors.estimatedValue}
+                  </span>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">
+                  Gold Purity *
+                </label>
+                <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border transition-colors ${
+                  errors.goldType ? 'border-rose-500/50' : 'border-slate-200'
+                }`}>
+                  {['24K', '22K', '20K', '18K'].map((purity) => {
+                    const isChecked = selectedGoldTypes.includes(purity);
+                    return (
+                      <label key={purity} className="flex items-center gap-2.5 text-sm text-slate-705 cursor-pointer select-none font-semibold">
+                        <input
+                          type="checkbox"
+                          disabled={isSubmitting}
+                          checked={isChecked}
+                          onChange={() => handleGoldTypeToggle(purity)}
+                          className="w-4.5 h-4.5 text-amber-600 border-slate-350 rounded focus:ring-amber-500/20 accent-amber-600 cursor-pointer"
+                        />
+                        {purity}
+                      </label>
+                    );
+                  })}
+                </div>
+                {errors.goldType && (
+                  <span className="flex items-center gap-1 mt-1 text-xs text-rose-500">
+                    <AlertCircle size={12} /> {errors.goldType}
                   </span>
                 )}
               </div>
