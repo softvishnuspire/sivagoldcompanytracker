@@ -258,6 +258,7 @@ export default function TelecallerDashboard() {
             branchName: formData.branchName,
             loanAmount: formData.loanAmount,
             loanAccountNumber: formData.loanAccountNumber,
+            status: formData.status,
             documents: formData.documents
           })
         });

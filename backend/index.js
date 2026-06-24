@@ -721,10 +721,16 @@ app.post('/api/telecaller/leads', authenticateToken, requireRole(['TELECALLER'])
       branchName,
       loanAmount,
       loanAccountNumber,
+      status,
       documents
     } = req.body;
 
-    if (!customerName || !mobile || !goldWeight || !estimatedValue || !bankName || !loanAmount) {
+    if (!customerName || !mobile) {
+      return res.status(400).json({ error: 'Customer name and mobile are required.' });
+    }
+
+    const isFollowup = status === 'FOLLOWUP_IN_PROGRESS';
+    if (!isFollowup && (!goldWeight || !estimatedValue || !bankName || !loanAmount)) {
       return res.status(400).json({ error: 'Required fields are missing.' });
     }
 
@@ -761,15 +767,15 @@ app.post('/api/telecaller/leads', authenticateToken, requireRole(['TELECALLER'])
         alternate_mobile: alternateMobile || null,
         address: address || null,
         district: district || null,
-        gold_weight: goldWeight,
+        gold_weight: goldWeight || 0,
         gold_type: goldType || null,
-        estimated_value: estimatedValue,
-        bank_name: bankName,
+        estimated_value: estimatedValue || 0,
+        bank_name: bankName || null,
         branch_name: branchName || null,
-        loan_amount: loanAmount,
+        loan_amount: loanAmount || 0,
         loan_account_number: loanAccountNumber || null,
         telecaller_id: req.user.id,
-        current_status: 'CUSTOMER_DETAILS_CREATED'
+        current_status: status || 'CUSTOMER_DETAILS_CREATED'
       })
       .select()
       .single();
@@ -798,11 +804,16 @@ app.post('/api/telecaller/leads', authenticateToken, requireRole(['TELECALLER'])
       if (docErr) console.error('Error inserting documents:', docErr);
     }
 
+    const initialStatus = status || 'CUSTOMER_DETAILS_CREATED';
+    const initialRemarks = initialStatus === 'FOLLOWUP_IN_PROGRESS'
+      ? 'Lead created as pending follow up by Telecaller'
+      : 'Lead created in systems directory by Telecaller';
+
     // Insert initial timeline
     await supabase.from('lead_timeline').insert({
       lead_id: leadId,
-      status: 'CUSTOMER_DETAILS_CREATED',
-      remarks: 'Lead created in systems directory by Telecaller',
+      status: initialStatus,
+      remarks: initialRemarks,
       updated_by: req.user.id
     });
 
