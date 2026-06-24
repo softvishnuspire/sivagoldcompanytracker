@@ -204,6 +204,7 @@ graph TD
   - Created custom `SkeletonLoaders` mirroring Recharts line, donut, and funnel shapes, plus table rows and stat cards to eliminate blank screen jumps.
   - Developed a progress-based `FileUploader` using native browser file reading and XMLHttpRequest upload tracking (0% to 100%).
   - Upgraded Telecaller, RM, Executive, and MD dashboards to use React Query hooks, optimistic timeline transitions (Updating... -> Completed/Failed), Sonner toast feedback, and skeleton loaders.
+- **House Visited Photo Verification**: Added mandatory house/location photo upload verification to the Field Executive workflow's Reached Customer (`REACHED_CUSTOMER`) transition stage. Implemented multipart file validation and magic bytes inspection on the backend, uploaded verified photos to Supabase storage `loan-documents` bucket, registered the documents as `'OTHER'` type in the database, and mapped `'OTHER'` document types to render as **"House Visit Proof"** in Executive, RM, MD, and Document Manager frontend views.
 
 
 

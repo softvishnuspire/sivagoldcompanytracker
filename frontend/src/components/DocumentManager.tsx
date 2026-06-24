@@ -140,7 +140,7 @@ export default function DocumentManager() {
       const docType = doc.document_type || 'OTHER';
       items.push({
         id: doc.id,
-        name: `${docType.replace(/_/g, ' ')} Document`,
+        name: docType === 'OTHER' ? 'House Visit Proof' : `${docType.replace(/_/g, ' ')} Document`,
         type: docType,
         url: doc.file_url,
         created_at: doc.created_at,

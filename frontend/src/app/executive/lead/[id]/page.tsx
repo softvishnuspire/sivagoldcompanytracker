@@ -125,6 +125,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
   const [visitDate, setVisitDate] = useState('');
   const [visitTime, setVisitTime] = useState('');
   const [visitRemarks, setVisitRemarks] = useState('');
+  const [houseImage, setHouseImage] = useState<File | null>(null);
   
   const [discussionNotes, setDiscussionNotes] = useState('');
   const [customerConfirmation, setCustomerConfirmation] = useState(false);
@@ -305,6 +306,7 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
       setVisitRemarks('');
       setDiscussionNotes('');
       setVerificationNotes('');
+      setHouseImage(null);
     } catch (err: any) {
       setError(err.message);
       
@@ -573,7 +575,9 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                       }}
                       className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-amber-500/35 text-xs font-semibold text-[#c3902c] flex items-center justify-between transition-colors text-left w-full cursor-pointer hover:bg-white"
                     >
-                      <span className="truncate">{(doc.document_type || doc.documentType || 'Document').replace(/_/g, ' ')}</span>
+                      <span className="truncate">
+                        {(doc.document_type || doc.documentType || 'Document') === 'OTHER' ? 'House Visit Proof' : (doc.document_type || doc.documentType || 'Document').replace(/_/g, ' ')}
+                      </span>
                       <svg className="w-3.5 h-3.5 text-[#c3902c] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                       </svg>
@@ -812,11 +816,33 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
               {currentStatus === 'JOURNEY_STARTED' && (
                 <div className="space-y-4">
                   <p className="text-xs text-slate-600 font-sans leading-relaxed">
-                    You are currently traveling. Record your arrival once you reach the customer.
+                    You are currently traveling. Upload a photo of the customer's house/location as proof of visit to record your arrival.
                   </p>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">House/Location Photo (Proof of Visit)</label>
+                    <input 
+                      type="file" 
+                      accept=".jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        const file = e.target.files ? e.target.files[0] : null;
+                        if (validateSelectedFile(file)) {
+                          setHouseImage(file);
+                        } else {
+                          e.target.value = '';
+                          setHouseImage(null);
+                        }
+                      }}
+                      className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-[#c3902c] hover:file:bg-amber-200 file:cursor-pointer"
+                    />
+                  </div>
                   <button 
-                    onClick={() => handleStatusChange('REACHED_CUSTOMER', { remarks: 'Executive reached customer location' })}
-                    disabled={submitting}
+                    onClick={() => {
+                      const formData = new FormData();
+                      if (houseImage) formData.append('houseImage', houseImage);
+                      formData.append('remarks', `Executive reached customer location. Uploaded visit proof photo: ${houseImage?.name || 'N/A'}`);
+                      handleStatusChange('REACHED_CUSTOMER', formData);
+                    }}
+                    disabled={submitting || !houseImage}
                     className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:brightness-110 active:scale-[0.98] text-slate-950 font-bold text-xs tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
                   >
                     <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

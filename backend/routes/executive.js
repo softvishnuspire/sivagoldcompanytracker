@@ -491,15 +491,38 @@ router.post('/start-journey', async (req, res) => {
 });
 
 // 6. POST /api/executive/reached-customer (Moves status to REACHED_CUSTOMER)
-router.post('/reached-customer', async (req, res) => {
+router.post('/reached-customer', upload.single('houseImage'), async (req, res) => {
   const { leadId, remarks } = req.body;
   const userId = req.user.id;
+
+  if (!leadId) {
+    return res.status(400).json({ error: 'leadId is required.' });
+  }
 
   try {
     const { data: lead, error } = await supabase.from('leads').select('current_status').eq('id', leadId).single();
     if (error || !lead) return res.status(404).json({ error: 'Lead not found.' });
 
     await verifyAndAdvanceStatus(leadId, lead.current_status, 'REACHED_CUSTOMER', userId);
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'House visited verification photo is required.' });
+    }
+
+    const detectedMime = validateMagicBytes(req.file.buffer);
+    if (!detectedMime) {
+      return res.status(400).json({ error: 'Security Alert: Invalid file content detected for houseImage.' });
+    }
+
+    const houseImageUrl = await uploadToSupabase('loan-documents', req.file.originalname, req.file.buffer, detectedMime);
+
+    // Save it in lead_documents
+    await supabase.from('lead_documents').insert([{
+      lead_id: leadId,
+      document_type: 'OTHER',
+      file_url: houseImageUrl,
+      uploaded_by: userId
+    }]);
 
     await supabase.from('leads').update({ current_status: 'REACHED_CUSTOMER', updated_at: new Date() }).eq('id', leadId);
 
@@ -509,7 +532,7 @@ router.post('/reached-customer', async (req, res) => {
       .eq('lead_id', leadId)
       .eq('status', 'started');
 
-    await addTimelineRecord(leadId, 'REACHED_CUSTOMER', remarks || 'Executive reached customer location', userId);
+    await addTimelineRecord(leadId, 'REACHED_CUSTOMER', remarks || 'Executive reached customer location and uploaded house photo', userId);
 
     return res.json({ message: 'Reached customer location recorded.' });
   } catch (err) {

@@ -1064,10 +1064,12 @@ export default function RMDashboard() {
                                     : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
                                 }`}
                               >
-                                <div className="flex flex-col gap-0.5 min-w-0">
-                                  <span className="text-xs font-bold truncate">{docType.replace(/_/g, ' ')}</span>
-                                  <span className="text-[9px] text-slate-400 font-mono">Attachment Link</span>
-                                </div>
+                                  <div className="flex flex-col gap-0.5 min-w-0">
+                                    <span className="text-xs font-bold truncate">
+                                      {docType === 'OTHER' ? 'House Visit Proof' : docType.replace(/_/g, ' ')}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 font-mono">Attachment Link</span>
+                                  </div>
                                 <span className="text-xs">👁️</span>
                               </button>
                             );

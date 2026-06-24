@@ -1127,7 +1127,9 @@ export default function MDDashboard() {
                                 }`}
                               >
                                 <div className="flex flex-col gap-0.5 min-w-0">
-                                  <span className="text-xs font-bold truncate">{doc.document_type.replace(/_/g, ' ')}</span>
+                                  <span className="text-xs font-bold truncate">
+                                    {doc.document_type === 'OTHER' ? 'House Visit Proof' : doc.document_type.replace(/_/g, ' ')}
+                                  </span>
                                   <span className="text-[9px] text-slate-400 font-mono">Click to Preview</span>
                                 </div>
                                 <span className="text-xs">👁️</span>
