@@ -698,23 +698,9 @@ router.get('/timeline', async (req, res) => {
   }
 });
 
-// 11.5 POST /api/md/branch
+// 11.5 POST /api/md/branch (Disabled)
 router.post('/branch', async (req, res) => {
-  try {
-    const { branch_name, city, state, address } = req.body;
-    if (!branch_name) {
-      return res.status(400).json({ error: 'branch_name is required' });
-    }
-    const { data, error } = await supabase
-      .from('branches')
-      .insert([{ branch_name, city, state, address }])
-      .select();
-    
-    if (error) throw error;
-    res.json({ success: true, branch: data[0] });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  res.status(403).json({ error: 'Branch creation is disabled. Only Hyderabad and Vijayawada branches are supported.' });
 });
 // 12. GET /api/md/branches-list
 router.get('/branches-list', async (req, res) => {
@@ -722,6 +708,7 @@ router.get('/branches-list', async (req, res) => {
     const { data, error } = await supabase
       .from('branches')
       .select('id, branch_name')
+      .in('branch_name', ['Vijayawada', 'Hyderabad'])
       .order('branch_name', { ascending: true });
 
     if (error) throw error;

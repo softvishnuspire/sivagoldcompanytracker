@@ -223,8 +223,81 @@ async function migrateLegacyPasswords() {
 }
 
 // =========================================================================
-// DATABASE SEED ROUTINE
+// DATABASE SEED & ALIGNMENT ROUTINE
 // =========================================================================
+async function ensureOnlyDefaultBranchesExist() {
+  try {
+    console.log('Running branch alignment migration...');
+    
+    // 1. Ensure Vijayawada and Hyderabad exist
+    const defaults = [
+      { branch_name: 'Vijayawada', city: 'Vijayawada', state: 'Andhra Pradesh', address: 'Vijayawada Branch Office' },
+      { branch_name: 'Hyderabad', city: 'Hyderabad', state: 'Telangana', address: 'Hyderabad Branch Office' }
+    ];
+
+    for (const b of defaults) {
+      const { data: exist, error: checkError } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('branch_name', b.branch_name)
+        .limit(1);
+
+      if (!checkError && (!exist || exist.length === 0)) {
+        console.log(`Seeding missing default branch: ${b.branch_name}`);
+        await supabase.from('branches').insert([b]);
+      }
+    }
+
+    // 2. Fetch the IDs of Vijayawada and Hyderabad
+    const { data: branches, error: fetchError } = await supabase
+      .from('branches')
+      .select('id, branch_name')
+      .in('branch_name', ['Vijayawada', 'Hyderabad']);
+
+    if (fetchError || !branches || branches.length < 2) {
+      console.error('Error fetching default branches or they are missing:', fetchError);
+      return;
+    }
+
+    const vijayawadaId = branches.find(b => b.branch_name === 'Vijayawada').id;
+    const hyderabadId = branches.find(b => b.branch_name === 'Hyderabad').id;
+
+    // 3. Find any users referencing branches other than Vijayawada or Hyderabad
+    const { data: usersToUpdate, error: usersError } = await supabase
+      .from('users')
+      .select('id, branch_id');
+
+    if (!usersError && usersToUpdate) {
+      const allowedIds = [vijayawadaId, hyderabadId];
+      for (const u of usersToUpdate) {
+        if (u.branch_id && !allowedIds.includes(u.branch_id)) {
+          // Reassign them to Vijayawada
+          console.log(`Reassigning user ${u.id} from branch ${u.branch_id} to Vijayawada branch ${vijayawadaId}`);
+          await supabase
+            .from('users')
+            .update({ branch_id: vijayawadaId })
+            .eq('id', u.id);
+        }
+      }
+    }
+
+    // 4. Delete any other branches
+    const { error: deleteError } = await supabase
+      .from('branches')
+      .delete()
+      .neq('branch_name', 'Vijayawada')
+      .neq('branch_name', 'Hyderabad');
+      
+    if (deleteError) {
+      console.warn('Failed to delete other branches:', deleteError.message);
+    } else {
+      console.log('Successfully cleaned up non-default branches.');
+    }
+  } catch (err) {
+    console.error('Error in ensureOnlyDefaultBranchesExist:', err.message);
+  }
+}
+
 async function seedDatabase() {
   try {
     // Check if users already exist
@@ -247,19 +320,17 @@ async function seedDatabase() {
 
     console.log('Seeding database with default Siva Gold records...');
 
-    // 1. Seed Branches
+    // 1. Seed Branches (only Vijayawada and Hyderabad)
     const branchesData = [
       { branch_name: 'Vijayawada', city: 'Vijayawada', state: 'Andhra Pradesh', address: 'Vijayawada Branch Office' },
-      { branch_name: 'Hyderabad', city: 'Hyderabad', state: 'Telangana', address: 'Hyderabad Branch Office' },
-      { branch_name: 'Vizag', city: 'Visakhapatnam', state: 'Andhra Pradesh', address: 'Vizag Branch Office' }
+      { branch_name: 'Hyderabad', city: 'Hyderabad', state: 'Telangana', address: 'Hyderabad Branch Office' }
     ];
 
     const { data: branches, error: branchErr } = await supabase.from('branches').insert(branchesData).select();
     if (branchErr) throw branchErr;
 
-    const vijayawadaBranchId = branches[0].id;
-    const hyderabadBranchId = branches[1].id;
-    const vizagBranchId = branches[2].id;
+    const vijayawadaBranchId = branches[0].branch_name === 'Vijayawada' ? branches[0].id : branches[1].id;
+    const hyderabadBranchId = branches[0].branch_name === 'Hyderabad' ? branches[0].id : branches[1].id;
 
     // 2. Seed Users (MD, RM, Telecaller, Executives)
     const salt = bcrypt.genSaltSync(10);
@@ -272,8 +343,8 @@ async function seedDatabase() {
       { employee_code: 'EX001', name: 'Vijay Kumar', mobile: '9666666661', email: 'ex1@sivagold.com', password_hash: defaultHash, role: 'EXECUTIVE', branch_id: vijayawadaBranchId, status: 'active' },
       { employee_code: 'EX002', name: 'Karthik', mobile: '9666666662', email: 'ex2@sivagold.com', password_hash: defaultHash, role: 'EXECUTIVE', branch_id: hyderabadBranchId, status: 'active' },
       { employee_code: 'EX003', name: 'Pradeep', mobile: '9666666663', email: 'ex3@sivagold.com', password_hash: defaultHash, role: 'EXECUTIVE', branch_id: hyderabadBranchId, status: 'active' },
-      { employee_code: 'EX004', name: 'Suresh', mobile: '9666666664', email: 'ex4@sivagold.com', password_hash: defaultHash, role: 'EXECUTIVE', branch_id: vizagBranchId, status: 'active' },
-      { employee_code: 'EX005', name: 'Ravi Teja', mobile: '9666666665', email: 'ex5@sivagold.com', password_hash: defaultHash, role: 'EXECUTIVE', branch_id: vizagBranchId, status: 'active' }
+      { employee_code: 'EX004', name: 'Suresh', mobile: '9666666664', email: 'ex4@sivagold.com', password_hash: defaultHash, role: 'EXECUTIVE', branch_id: hyderabadBranchId, status: 'active' },
+      { employee_code: 'EX005', name: 'Ravi Teja', mobile: '9666666665', email: 'ex5@sivagold.com', password_hash: defaultHash, role: 'EXECUTIVE', branch_id: vijayawadaBranchId, status: 'active' }
     ];
 
     const { data: users, error: userErr } = await supabase.from('users').insert(usersData).select();
@@ -597,7 +668,8 @@ async function seedDatabase() {
 }
 
 // Trigger DB seeding on backend startup
-setTimeout(() => {
+setTimeout(async () => {
+  await ensureOnlyDefaultBranchesExist();
   seedDatabase();
 }, 2000);
 

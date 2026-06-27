@@ -211,9 +211,6 @@ export default function MDDashboard() {
   const [fundRemarksInput, setFundRemarksInput] = useState<string>('');
   const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('Discrepancy in documentation');
 
-  // Branch forms
-  const [isAddBranchModalOpen, setIsAddBranchModalOpen] = useState<boolean>(false);
-  const [newBranchData, setNewBranchData] = useState({ branch_name: '', city: '', state: '', address: '' });
 
   // Employee Management
   const [employeesList, setEmployeesList] = useState<any[]>([]);
@@ -566,30 +563,7 @@ export default function MDDashboard() {
     }
   };
 
-  const handleAddBranch = async () => {
-    if (!newBranchData.branch_name) {
-      alert('Branch Name is required');
-      return;
-    }
-    try {
-      const res = await authenticatedFetch('http://localhost:5000/api/md/branch', {
-        method: 'POST',
-        body: JSON.stringify(newBranchData)
-      });
 
-      if (res.ok) {
-        setIsAddBranchModalOpen(false);
-        setNewBranchData({ branch_name: '', city: '', state: '', address: '' });
-        fetchBranchPerformance();
-      } else {
-        const err = await res.json();
-        alert(`Error: ${err.error}`);
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Error creating branch');
-    }
-  };
 
   const fetchEmployeesList = async () => {
     setLoading(true);
@@ -2049,12 +2023,6 @@ export default function MDDashboard() {
                 <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 animate-fadeIn">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Branch Performance</h3>
-                    <button
-                      onClick={() => setIsAddBranchModalOpen(true)}
-                      className="px-3 py-1.5 bg-[#4d0711] text-amber-500 rounded-lg text-[10px] font-bold hover:bg-[#2e040a] transition-all cursor-pointer shadow-sm"
-                    >
-                      + Add New Branch
-                    </button>
                   </div>
                   <div className="border border-slate-100 rounded-2xl overflow-hidden">
                     <table className="w-full border-collapse text-left text-xs">
@@ -2527,85 +2495,7 @@ export default function MDDashboard() {
         </div>
       )}
 
-      {/* ADD BRANCH MODAL */}
-      {isAddBranchModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl flex flex-col gap-4 animate-scaleUp">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-              <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide">
-                Add New Branch
-              </h3>
-              <button
-                onClick={() => setIsAddBranchModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
 
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Branch Name *</label>
-                <input
-                  type="text"
-                  value={newBranchData.branch_name}
-                  onChange={(e) => setNewBranchData({ ...newBranchData, branch_name: e.target.value })}
-                  placeholder="e.g. Mumbai"
-                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">City</label>
-                <input
-                  type="text"
-                  value={newBranchData.city}
-                  onChange={(e) => setNewBranchData({ ...newBranchData, city: e.target.value })}
-                  placeholder="e.g. Mumbai"
-                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">State</label>
-                <input
-                  type="text"
-                  value={newBranchData.state}
-                  onChange={(e) => setNewBranchData({ ...newBranchData, state: e.target.value })}
-                  placeholder="e.g. Maharashtra"
-                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Address</label>
-                <textarea
-                  value={newBranchData.address}
-                  onChange={(e) => setNewBranchData({ ...newBranchData, address: e.target.value })}
-                  placeholder="Full branch address..."
-                  rows={2}
-                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              <button
-                onClick={() => setIsAddBranchModalOpen(false)}
-                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddBranch}
-                className="w-full py-2.5 bg-[#4d0711] hover:bg-[#2e040a] text-amber-400 font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
-              >
-                Save Branch
-              </button>
-            </div>
-          </div>
-        </div>
-  )}
 
   {/* ADD/EDIT EMPLOYEE MODAL */}
   {isEmployeeModalOpen && (

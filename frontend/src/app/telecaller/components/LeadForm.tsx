@@ -27,7 +27,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
     mobile: '',
     alternateMobile: '',
     address: '',
-    district: 'Vijayawada',
+    district: '',
     goldWeight: '',
     goldType: '22K',
     estimatedValue: '',
@@ -40,10 +40,14 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
   });
 
   const [uploadedFiles, setUploadedFiles] = useState<{
-    LOAN_SLIP?: { name: string; progress: number; done: boolean; url?: string };
-    KYC?: { name: string; progress: number; done: boolean; url?: string };
-    ADDITIONAL?: { name: string; progress: number; done: boolean; url?: string };
-  }>({});
+    LOAN_SLIP: Array<{ id: string; name: string; progress: number; done: boolean; url?: string }>;
+    KYC: Array<{ id: string; name: string; progress: number; done: boolean; url?: string }>;
+    ADDITIONAL: Array<{ id: string; name: string; progress: number; done: boolean; url?: string }>;
+  }>({
+    LOAN_SLIP: [{ id: 'init-loan-0', name: '', progress: 0, done: false, url: '' }],
+    KYC: [{ id: 'init-kyc-0', name: '', progress: 0, done: false, url: '' }],
+    ADDITIONAL: [{ id: 'init-additional-0', name: '', progress: 0, done: false, url: '' }]
+  });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formStatus, setFormStatus] = useState<"Not Started" | "In Progress" | "Saved" | "Submitted">("Not Started");
@@ -103,15 +107,41 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
       });
 
       // Map editing documents
-      const docs: typeof uploadedFiles = {};
+      const docs = {
+        LOAN_SLIP: [] as Array<{ id: string; name: string; progress: number; done: boolean; url?: string }>,
+        KYC: [] as Array<{ id: string; name: string; progress: number; done: boolean; url?: string }>,
+        ADDITIONAL: [] as Array<{ id: string; name: string; progress: number; done: boolean; url?: string }>
+      };
+      
       editingLead.documents?.forEach(d => {
-        docs[d.documentType] = {
+        let cat: 'LOAN_SLIP' | 'KYC' | 'ADDITIONAL' = 'ADDITIONAL';
+        if (d.documentType === 'LOAN_SLIP') {
+          cat = 'LOAN_SLIP';
+        } else if (d.documentType === 'AADHAR' || d.documentType === 'PAN' || d.documentType === 'KYC') {
+          cat = 'KYC';
+        } else {
+          cat = 'ADDITIONAL';
+        }
+        
+        docs[cat].push({
+          id: d.id || `D-${Math.random().toString(36).substr(2, 9)}`,
           name: d.fileName,
           progress: 100,
           done: true,
           url: d.fileUrl
-        };
+        });
       });
+
+      if (docs.LOAN_SLIP.length === 0) {
+        docs.LOAN_SLIP.push({ id: `init-loan-${Math.random().toString(36).substr(2, 9)}`, name: '', progress: 0, done: false, url: '' });
+      }
+      if (docs.KYC.length === 0) {
+        docs.KYC.push({ id: `init-kyc-${Math.random().toString(36).substr(2, 9)}`, name: '', progress: 0, done: false, url: '' });
+      }
+      if (docs.ADDITIONAL.length === 0) {
+        docs.ADDITIONAL.push({ id: `init-additional-${Math.random().toString(36).substr(2, 9)}`, name: '', progress: 0, done: false, url: '' });
+      }
+      
       setUploadedFiles(docs);
       setFormStatus("Saved");
     } else {
@@ -148,6 +178,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         stepErrors.alternateMobile = 'Alternate mobile must be 10 digits';
       }
       if (!formData.address.trim()) stepErrors.address = 'Address is required';
+      if (!formData.district.trim()) stepErrors.district = 'District is required';
     }
 
     if (step === 2) {
@@ -173,6 +204,22 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
       }
       if (!formData.loanAccountNumber.trim()) {
         stepErrors.loanAccountNumber = 'Loan account number is required';
+      }
+    }
+
+    if (step === 4) {
+      const hasLoanSlip = uploadedFiles.LOAN_SLIP.some(f => f.done && f.url);
+      const hasKyc = uploadedFiles.KYC.some(f => f.done && f.url);
+      const hasAdditional = uploadedFiles.ADDITIONAL.some(f => f.done && f.url);
+
+      if (!hasLoanSlip) {
+        stepErrors.LOAN_SLIP = 'At least one Loan Slip / Pledge Slip document is required';
+      }
+      if (!hasKyc) {
+        stepErrors.KYC = 'At least one KYC document (Aadhaar/PAN) is required';
+      }
+      if (!hasAdditional) {
+        stepErrors.ADDITIONAL = 'At least one Additional document is required';
       }
     }
 
@@ -203,16 +250,22 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
 
     // Build documents array
     const documents: Document[] = [];
-    Object.entries(uploadedFiles).forEach(([type, file]) => {
-      if (file && file.done) {
-        documents.push({
-          id: `D-${Math.random().toString(36).substr(2, 9)}`,
-          leadId: editingLead?.id || '',
-          documentType: type as Document['documentType'],
-          fileName: file.name,
-          fileUrl: file.url || '#',
-          uploadedBy: 'TC-01',
-          createdAt: new Date().toISOString()
+    Object.entries(uploadedFiles).forEach(([type, slots]) => {
+      if (Array.isArray(slots)) {
+        slots.forEach((file) => {
+          if (file && file.done && file.url) {
+            documents.push({
+              id: file.id.startsWith('slot-') || file.id.startsWith('init-')
+                ? `D-${Math.random().toString(36).substr(2, 9)}`
+                : file.id,
+              leadId: editingLead?.id || '',
+              documentType: type as Document['documentType'],
+              fileName: file.name,
+              fileUrl: file.url,
+              uploadedBy: 'TC-01',
+              createdAt: new Date().toISOString()
+            });
+          }
         });
       }
     });
@@ -424,19 +477,22 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">
                   District *
                 </label>
-                <select
+                <input
+                  type="text"
                   name="district"
                   disabled={isSubmitting}
                   value={formData.district}
                   onChange={handleInputChange}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 disabled:opacity-60"
-                >
-                  <option value="Vijayawada">Vijayawada</option>
-                  <option value="Hyderabad">Hyderabad</option>
-                  <option value="Vizag">Vizag</option>
-                  <option value="Guntur">Guntur</option>
-                  <option value="Nellore">Nellore</option>
-                </select>
+                  placeholder="e.g. Vijayawada"
+                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
+                    errors.district ? 'border-rose-500/50' : 'border-slate-200'
+                  }`}
+                />
+                {errors.district && (
+                  <span className="flex items-center gap-1 mt-1 text-xs text-rose-500">
+                    <AlertCircle size={12} /> {errors.district}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -721,40 +777,83 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
               Document Uploads
             </h3>
             
-            <div className="space-y-4">
+            <div className="space-y-6">
               {[
                 { type: 'LOAN_SLIP' as const, label: 'Loan Slip / Bank Pledge Slip' },
                 { type: 'KYC' as const, label: 'KYC Document (Aadhaar/PAN)' },
                 { type: 'ADDITIONAL' as const, label: 'Additional Documents (Purity test report, etc.)' }
-              ].map((docType) => {
-                const file = uploadedFiles[docType.type];
+              ].map((docCategory) => {
+                const slots = uploadedFiles[docCategory.type] || [];
                 return (
-                  <FileUploader
-                    key={docType.type}
-                    label={docType.label}
-                    documentType={docType.type}
-                    initialUrl={file?.url || ""}
-                    initialName={file?.name || ""}
-                    onUploadSuccess={(url, name) => {
-                      if (formStatus === "Not Started") {
-                        setFormStatus("In Progress");
-                      }
-                      setUploadedFiles(prev => ({
-                        ...prev,
-                        [docType.type]: { name, progress: 100, done: true, url }
-                      }));
-                    }}
-                    onRemove={() => {
-                      if (formStatus === "Not Started") {
-                        setFormStatus("In Progress");
-                      }
-                      setUploadedFiles(prev => {
-                        const copy = { ...prev };
-                        delete copy[docType.type];
-                        return copy;
-                      });
-                    }}
-                  />
+                  <div key={docCategory.type} className="space-y-3 p-4 border border-slate-200/60 rounded-2xl bg-slate-50/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-700">
+                        {docCategory.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadedFiles(prev => ({
+                            ...prev,
+                            [docCategory.type]: [
+                              ...prev[docCategory.type],
+                              { id: `slot-${Math.random().toString(36).substr(2, 9)}`, name: '', progress: 0, done: false, url: '' }
+                            ]
+                          }));
+                        }}
+                        className="flex items-center gap-1 text-xs font-bold text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 py-1.5 px-3 rounded-lg border border-amber-200 transition-all cursor-pointer"
+                      >
+                        <Plus size={14} /> Add More
+                      </button>
+                    </div>
+                    
+                    {slots.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-2">No documents added. Click "Add More" to upload.</p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {slots.map((slot, index) => (
+                          <FileUploader
+                            key={slot.id}
+                            label={`${docCategory.label} #${index + 1}`}
+                            documentType={docCategory.type}
+                            initialUrl={slot.url || ""}
+                            initialName={slot.name || ""}
+                            onUploadSuccess={(url, name) => {
+                              if (formStatus === "Not Started") {
+                                setFormStatus("In Progress");
+                              }
+                              setUploadedFiles(prev => ({
+                                ...prev,
+                                [docCategory.type]: prev[docCategory.type].map(s => 
+                                  s.id === slot.id ? { ...s, name, progress: 100, done: true, url } : s
+                                )
+                              }));
+                            }}
+                            onRemove={() => {
+                              if (slot.url || slot.name) {
+                                if (!window.confirm("Are you sure you want to remove this uploaded document?")) {
+                                  return;
+                                }
+                              }
+                              if (formStatus === "Not Started") {
+                                setFormStatus("In Progress");
+                              }
+                              setUploadedFiles(prev => ({
+                                ...prev,
+                                [docCategory.type]: prev[docCategory.type].filter(s => s.id !== slot.id)
+                              }));
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {errors[docCategory.type] && (
+                      <span className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-rose-500 bg-rose-50/80 border border-rose-200/50 rounded-xl p-2.5">
+                        <AlertCircle size={13} className="shrink-0" /> {errors[docCategory.type]}
+                      </span>
+                    )}
+                  </div>
                 );
               })}
             </div>
