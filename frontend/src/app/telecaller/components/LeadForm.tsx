@@ -18,9 +18,10 @@ interface LeadFormProps {
   onSave: (lead: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => void | Promise<void>;
   editingLead?: Lead | null;
   onCancel: () => void;
+  leadSources?: string[];
 }
 
-export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProps) {
+export default function LeadForm({ onSave, editingLead, onCancel, leadSources = [] }: LeadFormProps) {
   const [activeStep, setActiveStep] = useState<number>(1);
   const [formData, setFormData] = useState({
     customerName: '',
@@ -39,6 +40,20 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
     status: 'CUSTOMER_DETAILS_CREATED' as Lead['status']
   });
 
+  const [selectedPurities, setSelectedPurities] = useState<string[]>(['22K']);
+  const [purityWeights, setPurityWeights] = useState<Record<string, string>>({
+    '24K': '',
+    '22K': '',
+    '20K': '',
+    '18K': ''
+  });
+  const [purityEstimatedValues, setPurityEstimatedValues] = useState<Record<string, string>>({
+    '24K': '',
+    '22K': '',
+    '20K': '',
+    '18K': ''
+  });
+
   const [uploadedFiles, setUploadedFiles] = useState<{
     LOAN_SLIP: Array<{ id: string; name: string; progress: number; done: boolean; url?: string }>;
     KYC: Array<{ id: string; name: string; progress: number; done: boolean; url?: string }>;
@@ -53,27 +68,116 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
   const [formStatus, setFormStatus] = useState<"Not Started" | "In Progress" | "Saved" | "Submitted">("Not Started");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const selectedGoldTypes = formData.goldType
-    ? formData.goldType.split(', ').map(s => s.trim()).filter(Boolean)
-    : [];
+  const parsePurityWeightsAndEstimates = (goldTypeStr: string, totalWeightStr: string, totalEstStr: string) => {
+    const weights: Record<string, string> = {
+      '24K': '',
+      '22K': '',
+      '20K': '',
+      '18K': ''
+    };
+    const estimates: Record<string, string> = {
+      '24K': '',
+      '22K': '',
+      '20K': '',
+      '18K': ''
+    };
+
+    if (!goldTypeStr) return { weights, estimates };
+
+    // Matches e.g. "24K (10g, ₹50000)" or "22K (20.5g)" or "20K (15.5 g, ₹60000)"
+    const regex = /(\d+K)\s*\(?\s*([0-9.]+)\s*g?\s*(?:,\s*₹?\s*([0-9.]+))?\s*\)?/gi;
+    let match;
+    let foundAny = false;
+
+    while ((match = regex.exec(goldTypeStr)) !== null) {
+      const purity = match[1].toUpperCase();
+      const weight = match[2];
+      const estimate = match[3] || '';
+      if (purity in weights) {
+        weights[purity] = weight;
+        estimates[purity] = estimate;
+        foundAny = true;
+      }
+    }
+
+    if (!foundAny) {
+      const purities = goldTypeStr.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+      if (purities.length === 1 && purities[0] in weights) {
+        weights[purities[0]] = totalWeightStr;
+        estimates[purities[0]] = totalEstStr;
+      }
+    }
+
+    return { weights, estimates };
+  };
+
+  const updateGoldFormData = (
+    purities: string[], 
+    weights: Record<string, string>, 
+    estimates: Record<string, string>
+  ) => {
+    const goldTypeParts = purities.map(p => {
+      const w = weights[p] || '';
+      const ev = estimates[p] || '';
+      if (w && ev) {
+        return `${p} (${w}g, ₹${ev})`;
+      } else if (w) {
+        return `${p} (${w}g)`;
+      } else {
+        return p;
+      }
+    });
+    const goldTypeStr = goldTypeParts.join(', ');
+
+    let totalWeight = 0;
+    let hasAnyWeight = false;
+    purities.forEach(p => {
+      const w = parseFloat(weights[p]);
+      if (!isNaN(w) && w > 0) {
+        totalWeight += w;
+        hasAnyWeight = true;
+      }
+    });
+
+    let totalEstimatedValue = 0;
+    let hasAnyEstValue = false;
+    purities.forEach(p => {
+      const ev = parseFloat(estimates[p]);
+      if (!isNaN(ev) && ev > 0) {
+        totalEstimatedValue += ev;
+        hasAnyEstValue = true;
+      }
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      goldType: goldTypeStr,
+      goldWeight: hasAnyWeight ? totalWeight.toFixed(2) : prev.goldWeight,
+      estimatedValue: hasAnyEstValue ? totalEstimatedValue.toFixed(2) : prev.estimatedValue
+    }));
+  };
 
   const handleGoldTypeToggle = (purity: string) => {
-    let current = formData.goldType
-      ? formData.goldType.split(', ').map(s => s.trim()).filter(Boolean)
-      : [];
-    
-    if (current.includes(purity)) {
-      current = current.filter(t => t !== purity);
-    } else {
-      current = [...current, purity];
-    }
-    
-    const order = ['24K', '22K', '20K', '18K'];
-    current.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    let nextPurities = [...selectedPurities];
+    const nextWeights = { ...purityWeights };
+    const nextEstimates = { ...purityEstimatedValues };
 
-    const updatedGoldType = current.join(', ');
-    setFormData(prev => ({ ...prev, goldType: updatedGoldType }));
-    
+    if (nextPurities.includes(purity)) {
+      nextPurities = nextPurities.filter(p => p !== purity);
+      nextWeights[purity] = ''; // Clear weight when unchecked
+      nextEstimates[purity] = ''; // Clear estimate when unchecked
+    } else {
+      nextPurities.push(purity);
+    }
+
+    const order = ['24K', '22K', '20K', '18K'];
+    nextPurities.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+
+    setSelectedPurities(nextPurities);
+    setPurityWeights(nextWeights);
+    setPurityEstimatedValues(nextEstimates);
+    updateGoldFormData(nextPurities, nextWeights, nextEstimates);
+
     if (formStatus === "Not Started") {
       setFormStatus("In Progress");
     }
@@ -82,6 +186,42 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
       setErrors(prev => {
         const copy = { ...prev };
         delete copy.goldType;
+        return copy;
+      });
+    }
+  };
+
+  const handleWeightChange = (purity: string, value: string) => {
+    const nextWeights = { ...purityWeights, [purity]: value };
+    setPurityWeights(nextWeights);
+    updateGoldFormData(selectedPurities, nextWeights, purityEstimatedValues);
+
+    if (formStatus === "Not Started") {
+      setFormStatus("In Progress");
+    }
+
+    if (errors[`weight_${purity}`]) {
+      setErrors(prev => {
+        const copy = { ...prev };
+        delete copy[`weight_${purity}`];
+        return copy;
+      });
+    }
+  };
+
+  const handleEstimateChange = (purity: string, value: string) => {
+    const nextEstimates = { ...purityEstimatedValues, [purity]: value };
+    setPurityEstimatedValues(nextEstimates);
+    updateGoldFormData(selectedPurities, purityWeights, nextEstimates);
+
+    if (formStatus === "Not Started") {
+      setFormStatus("In Progress");
+    }
+
+    if (errors[`estimate_${purity}`]) {
+      setErrors(prev => {
+        const copy = { ...prev };
+        delete copy[`estimate_${purity}`];
         return copy;
       });
     }
@@ -106,6 +246,22 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
         status: editingLead.status
       });
 
+      // Parse and populate purity weights and estimated values
+      const { weights: parsedWeights, estimates: parsedEstimates } = parsePurityWeightsAndEstimates(
+        editingLead.goldType,
+        editingLead.goldWeight.toString(),
+        editingLead.estimatedValue.toString()
+      );
+      setPurityWeights(parsedWeights);
+      setPurityEstimatedValues(parsedEstimates);
+
+      let activePurities = Object.keys(parsedWeights).filter(p => parsedWeights[p] !== '');
+      if (activePurities.length === 0 && editingLead.goldType) {
+        // Fallback: if weights weren't parsed but purities are listed (old format)
+        activePurities = editingLead.goldType.split(', ').map(s => s.trim().toUpperCase()).filter(Boolean);
+      }
+      setSelectedPurities(activePurities);
+
       // Map editing documents
       const docs = {
         LOAN_SLIP: [] as Array<{ id: string; name: string; progress: number; done: boolean; url?: string }>,
@@ -115,9 +271,10 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
       
       editingLead.documents?.forEach(d => {
         let cat: 'LOAN_SLIP' | 'KYC' | 'ADDITIONAL' = 'ADDITIONAL';
-        if (d.documentType === 'LOAN_SLIP') {
+        const typeStr = d.documentType as string;
+        if (typeStr === 'LOAN_SLIP') {
           cat = 'LOAN_SLIP';
-        } else if (d.documentType === 'AADHAR' || d.documentType === 'PAN' || d.documentType === 'KYC') {
+        } else if (typeStr === 'AADHAR' || typeStr === 'PAN' || typeStr === 'KYC') {
           cat = 'KYC';
         } else {
           cat = 'ADDITIONAL';
@@ -146,6 +303,19 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
       setFormStatus("Saved");
     } else {
       setFormStatus("Not Started");
+      setSelectedPurities(['22K']);
+      setPurityWeights({
+        '24K': '',
+        '22K': '',
+        '20K': '',
+        '18K': ''
+      });
+      setPurityEstimatedValues({
+        '24K': '',
+        '22K': '',
+        '20K': '',
+        '18K': ''
+      });
     }
   }, [editingLead]);
 
@@ -182,16 +352,27 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
     }
 
     if (step === 2) {
+      if (selectedPurities.length === 0) {
+        stepErrors.goldType = 'At least one gold purity must be selected';
+      } else {
+        selectedPurities.forEach(purity => {
+          const w = parseFloat(purityWeights[purity]);
+          if (isNaN(w) || w <= 0) {
+            stepErrors[`weight_${purity}`] = `${purity} weight must be a positive number`;
+          }
+          const ev = parseFloat(purityEstimatedValues[purity]);
+          if (isNaN(ev) || ev <= 0) {
+            stepErrors[`estimate_${purity}`] = `${purity} estimated value must be a positive number`;
+          }
+        });
+      }
       const weight = parseFloat(formData.goldWeight);
       if (isNaN(weight) || weight <= 0) {
-        stepErrors.goldWeight = 'Weight must be a positive number';
+        stepErrors.goldWeight = 'Total weight must be a positive number';
       }
       const val = parseFloat(formData.estimatedValue);
       if (isNaN(val) || val <= 0) {
-        stepErrors.estimatedValue = 'Estimated value must be a positive number';
-      }
-      if (!formData.goldType || formData.goldType.trim() === '') {
-        stepErrors.goldType = 'At least one gold purity must be selected';
+        stepErrors.estimatedValue = 'Total estimated value must be a positive number';
       }
     }
 
@@ -576,12 +757,20 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                 className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 disabled:opacity-60"
               >
                 <option value="">Select source (optional)</option>
-                <option value="Website">Website</option>
-                <option value="Facebook Ads">Facebook Ads</option>
-                <option value="Google Ads">Google Ads</option>
-                <option value="Referrals">Referrals</option>
-                <option value="Direct Calls">Direct Calls</option>
-                <option value="Walk Ins">Walk Ins</option>
+                {leadSources && leadSources.length > 0 ? (
+                  leadSources.map((src) => (
+                    <option key={src} value={src}>{src}</option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Website">Website</option>
+                    <option value="Facebook Ads">Facebook Ads</option>
+                    <option value="Google Ads">Google Ads</option>
+                    <option value="Referrals">Referrals</option>
+                    <option value="Direct Calls">Direct Calls</option>
+                    <option value="Walk Ins">Walk Ins</option>
+                  </>
+                )}
               </select>
             </div>
           </div>
@@ -594,7 +783,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
               Gold & Asset Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">
                   Gold Weight (Grams) *
                 </label>
@@ -602,39 +791,18 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                   type="number"
                   step="0.01"
                   name="goldWeight"
+                  readOnly
                   disabled={isSubmitting}
                   value={formData.goldWeight}
-                  onChange={handleInputChange}
-                  placeholder="e.g. 45.80"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
+                  placeholder="Calculated automatically"
+                  className={`w-full bg-slate-50 border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none placeholder-slate-400/70 disabled:opacity-60 cursor-not-allowed ${
                     errors.goldWeight ? 'border-rose-500/50' : 'border-slate-200'
                   }`}
                 />
+                <p className="text-[10px] text-slate-400 mt-1">Calculated automatically as the sum of purity weights.</p>
                 {errors.goldWeight && (
                   <span className="flex items-center gap-1 mt-1 text-xs text-rose-500">
                     <AlertCircle size={12} /> {errors.goldWeight}
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">
-                  Estimated Value (₹) *
-                </label>
-                <input
-                  type="number"
-                  name="estimatedValue"
-                  disabled={isSubmitting}
-                  value={formData.estimatedValue}
-                  onChange={handleInputChange}
-                  placeholder="e.g. 250000"
-                  className={`w-full bg-white border rounded-xl py-2.5 px-3.5 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
-                    errors.estimatedValue ? 'border-rose-500/50' : 'border-slate-200'
-                  }`}
-                />
-                {errors.estimatedValue && (
-                  <span className="flex items-center gap-1 mt-1 text-xs text-rose-500">
-                    <AlertCircle size={12} /> {errors.estimatedValue}
                   </span>
                 )}
               </div>
@@ -647,7 +815,7 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                   errors.goldType ? 'border-rose-500/50' : 'border-slate-200'
                 }`}>
                   {['24K', '22K', '20K', '18K'].map((purity) => {
-                    const isChecked = selectedGoldTypes.includes(purity);
+                    const isChecked = selectedPurities.includes(purity);
                     return (
                       <label key={purity} className="flex items-center gap-2.5 text-sm text-slate-705 cursor-pointer select-none font-semibold">
                         <input
@@ -668,6 +836,62 @@ export default function LeadForm({ onSave, editingLead, onCancel }: LeadFormProp
                   </span>
                 )}
               </div>
+
+              {selectedPurities.length > 0 && (
+                <div className="md:col-span-2 space-y-4 bg-amber-500/5 p-4 sm:p-6 rounded-xl border border-amber-500/20 animate-fadeIn">
+                  <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider border-b border-amber-500/10 pb-2 mb-2">
+                    Purity Details (Weight & Estimated Value)
+                  </h4>
+                  <div className="space-y-4">
+                    {selectedPurities.map((purity) => (
+                      <div key={purity} className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-slate-200/40 pb-4 last:border-0 last:pb-0 animate-fadeIn">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-605 mb-1 uppercase">
+                            {purity} Gold Weight (Grams) *
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            disabled={isSubmitting}
+                            value={purityWeights[purity] || ''}
+                            onChange={(e) => handleWeightChange(purity, e.target.value)}
+                            placeholder={`Enter weight for ${purity}`}
+                            className={`w-full bg-white border rounded-xl py-2 px-3 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
+                              errors[`weight_${purity}`] ? 'border-rose-500/50' : 'border-slate-200'
+                            }`}
+                          />
+                          {errors[`weight_${purity}`] && (
+                            <span className="flex items-center gap-1 mt-1 text-xs text-rose-500">
+                              <AlertCircle size={12} /> {errors[`weight_${purity}`]}
+                            </span>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-655 mb-1 uppercase">
+                            {purity} Estimated Value (₹) *
+                          </label>
+                          <input
+                            type="number"
+                            disabled={isSubmitting}
+                            value={purityEstimatedValues[purity] || ''}
+                            onChange={(e) => handleEstimateChange(purity, e.target.value)}
+                            placeholder={`Enter estimated value for ${purity}`}
+                            className={`w-full bg-white border rounded-xl py-2 px-3 text-sm text-slate-800 outline-none transition-all focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 placeholder-slate-400/70 disabled:opacity-60 ${
+                              errors[`estimate_${purity}`] ? 'border-rose-500/50' : 'border-slate-200'
+                            }`}
+                          />
+                          {errors[`estimate_${purity}`] && (
+                            <span className="flex items-center gap-1 mt-1 text-xs text-rose-500">
+                              <AlertCircle size={12} /> {errors[`estimate_${purity}`]}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

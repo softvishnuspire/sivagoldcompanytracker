@@ -34,10 +34,10 @@ export default function PendingFollowupsList({ leads, onEdit, onDelete }: Pendin
     if (!isFollowup || !isMissingDetails) return false;
 
     const matchesSearch = 
-      lead.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.mobile.includes(searchTerm) ||
-      lead.leadNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.district.toLowerCase().includes(searchTerm.toLowerCase());
+      (lead.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.mobile || '').includes(searchTerm) ||
+      (lead.leadNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.district || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     return matchesSearch;
   });

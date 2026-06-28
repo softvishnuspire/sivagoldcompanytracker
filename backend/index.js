@@ -763,7 +763,7 @@ app.get('/api/telecaller/leads', authenticateToken, requireRole(['TELECALLER']),
       .from('leads')
       .select(`
         *,
-        documents:lead_documents(*),
+        documents:lead_documents(id, lead_id, document_type, created_at, uploaded_by),
         interactions:customer_interactions(*),
         timeline:lead_timeline(*)
       `)
@@ -772,6 +772,31 @@ app.get('/api/telecaller/leads', authenticateToken, requireRole(['TELECALLER']),
     
     if (error) throw error;
     res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 1.5 GET /api/telecaller/leads/:id
+app.get('/api/telecaller/leads/:id', authenticateToken, requireRole(['TELECALLER']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .select(`
+        *,
+        documents:lead_documents(*),
+        interactions:customer_interactions(*),
+        timeline:lead_timeline(*)
+      `)
+      .eq('id', id)
+      .eq('telecaller_id', req.user.id)
+      .single();
+    
+    if (error || !lead) {
+      return res.status(404).json({ error: 'Lead not found or access denied.' });
+    }
+    res.json(lead);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1151,7 +1176,7 @@ app.post('/api/telecaller/leads/:id/complete-followup', authenticateToken, requi
 
 
 // Helper to get active executives
-app.get('/api/rm/executives', authenticateToken, requireRole(['RM']), async (req, res) => {
+app.get('/api/rm/executives', authenticateToken, requireRole(['RM', 'MD']), async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -1268,7 +1293,7 @@ app.get('/api/rm/dashboard', authenticateToken, requireRole(['RM']), async (req,
 });
 
 // 2. GET /api/rm/pending-leads
-app.get('/api/rm/pending-leads', authenticateToken, requireRole(['RM']), async (req, res) => {
+app.get('/api/rm/pending-leads', authenticateToken, requireRole(['RM', 'MD']), async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('leads')
@@ -1286,7 +1311,7 @@ app.get('/api/rm/pending-leads', authenticateToken, requireRole(['RM']), async (
 });
 
 // 3. GET /api/rm/lead/:id
-app.get('/api/rm/lead/:id', authenticateToken, requireRole(['RM']), async (req, res) => {
+app.get('/api/rm/lead/:id', authenticateToken, requireRole(['RM', 'MD']), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1329,7 +1354,7 @@ app.get('/api/rm/lead/:id', authenticateToken, requireRole(['RM']), async (req, 
 });
 
 // 4. POST /api/rm/approve
-app.post('/api/rm/approve', authenticateToken, requireRole(['RM']), async (req, res) => {
+app.post('/api/rm/approve', authenticateToken, requireRole(['RM', 'MD']), async (req, res) => {
   try {
     const { leadId, remarks, approvalNotes } = req.body;
     if (!leadId) return res.status(400).json({ error: 'leadId is required' });
@@ -1362,7 +1387,7 @@ app.post('/api/rm/approve', authenticateToken, requireRole(['RM']), async (req, 
 });
 
 // 5. POST /api/rm/reverify
-app.post('/api/rm/reverify', authenticateToken, requireRole(['RM']), async (req, res) => {
+app.post('/api/rm/reverify', authenticateToken, requireRole(['RM', 'MD']), async (req, res) => {
   try {
     const { leadId, reason, requiredInformation, remarks } = req.body;
     if (!leadId) return res.status(400).json({ error: 'leadId is required' });
@@ -1395,7 +1420,7 @@ app.post('/api/rm/reverify', authenticateToken, requireRole(['RM']), async (req,
 });
 
 // 6. POST /api/rm/reject
-app.post('/api/rm/reject', authenticateToken, requireRole(['RM']), async (req, res) => {
+app.post('/api/rm/reject', authenticateToken, requireRole(['RM', 'MD']), async (req, res) => {
   try {
     const { leadId, rejectionReason, remarks } = req.body;
     if (!leadId) return res.status(400).json({ error: 'leadId is required' });
@@ -1428,7 +1453,7 @@ app.post('/api/rm/reject', authenticateToken, requireRole(['RM']), async (req, r
 });
 
 // 7. POST /api/rm/assign-executive
-app.post('/api/rm/assign-executive', authenticateToken, requireRole(['RM']), async (req, res) => {
+app.post('/api/rm/assign-executive', authenticateToken, requireRole(['RM', 'MD']), async (req, res) => {
   try {
     const { leadId, executiveId } = req.body;
     if (!leadId || !executiveId) return res.status(400).json({ error: 'leadId and executiveId are required' });
@@ -1472,7 +1497,7 @@ app.post('/api/rm/assign-executive', authenticateToken, requireRole(['RM']), asy
 });
 
 // 8. GET /api/rm/approved-leads
-app.get('/api/rm/approved-leads', authenticateToken, requireRole(['RM']), async (req, res) => {
+app.get('/api/rm/approved-leads', authenticateToken, requireRole(['RM', 'MD']), async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('leads')
@@ -1645,50 +1670,119 @@ app.get('/api/rm/reports', authenticateToken, requireRole(['RM']), async (req, r
 // STANDARD ENDPOINTS
 // =========================================================================
 // Unified Document Manager Endpoint for all roles
+// Unified Document Manager Endpoint for all roles
 app.get('/api/documents/leads', authenticateToken, requireRole(['TELECALLER', 'RM', 'EXECUTIVE', 'MD']), async (req, res) => {
   try {
-    const { data: leads, error } = await supabase
-      .from('leads')
-      .select(`
-        id,
-        lead_number,
-        customer_name,
-        current_status,
-        created_at,
-        lead_documents (
-          id,
-          document_type,
-          file_url,
-          created_at,
-          uploaded_by,
-          uploader:uploaded_by (name, role)
-        ),
-        gold_images (
-          id,
-          image_url,
-          created_at,
-          uploaded_by,
-          uploader:uploaded_by (name, role)
-        ),
-        payments (
-          id,
-          payment_proof,
-          created_at,
-          created_by,
-          uploader:created_by (name, role)
-        )
-      `)
-      .order('created_at', { ascending: false });
+    const [leadsRes, docsRes, goldRes, paymentsRes] = await Promise.all([
+      supabase
+        .from('leads')
+        .select('id, lead_number, customer_name, current_status, created_at')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('lead_documents')
+        .select('id, lead_id, document_type, created_at, uploaded_by, uploader:uploaded_by (name, role)'),
+      supabase
+        .from('gold_images')
+        .select('id, lead_id, created_at, uploaded_by, uploader:uploaded_by (name, role)'),
+      supabase
+        .from('payments')
+        .select('id, lead_id, created_at, created_by, uploader:created_by (name, role)')
+    ]);
 
-    if (error) {
-      console.error('Error fetching documents/leads:', error.message);
-      return res.status(400).json({ error: error.message });
+    if (leadsRes.error) {
+      console.error('Error fetching leads:', leadsRes.error.message);
+      return res.status(400).json({ error: leadsRes.error.message });
+    }
+    if (docsRes.error) {
+      console.error('Error fetching lead documents:', docsRes.error.message);
+      return res.status(400).json({ error: docsRes.error.message });
+    }
+    if (goldRes.error) {
+      console.error('Error fetching gold images:', goldRes.error.message);
+      return res.status(400).json({ error: goldRes.error.message });
+    }
+    if (paymentsRes.error) {
+      console.error('Error fetching payments:', paymentsRes.error.message);
+      return res.status(400).json({ error: paymentsRes.error.message });
     }
 
-    res.json(leads || []);
+    const leads = leadsRes.data || [];
+    const leadDocuments = (docsRes.data || []).map(d => ({
+      ...d,
+      file_url: `PLACEHOLDER_document_${d.id}`
+    }));
+    const goldImages = (goldRes.data || []).map(g => ({
+      ...g,
+      image_url: `PLACEHOLDER_gold_${g.id}`
+    }));
+    const payments = (paymentsRes.data || []).map(p => ({
+      ...p,
+      payment_proof: `PLACEHOLDER_payment_${p.id}`
+    }));
+
+    const assembledLeads = leads.map(lead => ({
+      ...lead,
+      lead_documents: leadDocuments.filter(d => d.lead_id === lead.id),
+      gold_images: goldImages.filter(g => g.lead_id === lead.id),
+      payments: payments.filter(p => p.lead_id === lead.id)
+    }));
+
+    res.json(assembledLeads);
   } catch (err) {
     console.error('Error in documents/leads endpoint:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+// Lazy-load file URL by category and ID
+app.get('/api/documents/file/:category/:id', authenticateToken, requireRole(['TELECALLER', 'RM', 'EXECUTIVE', 'MD']), async (req, res) => {
+  try {
+    const { category, id } = req.params;
+    let table = '';
+    let selectCol = '';
+    
+    if (category === 'document') {
+      table = 'lead_documents';
+      selectCol = 'file_url';
+    } else if (category === 'gold') {
+      table = 'gold_images';
+      selectCol = 'image_url';
+    } else if (category === 'payment') {
+      table = 'payments';
+      selectCol = 'payment_proof';
+    } else {
+      return res.status(400).json({ error: 'Invalid category' });
+    }
+    
+    const { data, error } = await supabase
+      .from(table)
+      .select(selectCol)
+      .eq('id', id)
+      .single();
+      
+    if (error || !data) {
+      return res.status(404).json({ error: 'File not found or access denied.' });
+    }
+    
+    res.json({ url: data[selectCol] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/lead-sources - Fetch active lead sources
+app.get('/api/lead-sources', authenticateToken, requireRole(['TELECALLER', 'RM', 'EXECUTIVE', 'MD']), async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('lead_sources')
+      .select('*')
+      .eq('status', 'active')
+      .order('source_name', { ascending: true });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -2170,3 +2264,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+

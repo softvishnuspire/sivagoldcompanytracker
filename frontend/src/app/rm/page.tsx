@@ -120,6 +120,50 @@ const getActiveStepIndex = (status: string): number => {
   }
 };
 
+const renderGoldPurityWeights = (goldType: string | undefined, goldWeight: number) => {
+  if (!goldType) return <span className="font-bold text-slate-800">N/A</span>;
+
+  const items: { purity: string; weight: string; estimate?: string }[] = [];
+  const regex = /(\d+K)\s*\(?\s*([0-9.]+)\s*g?\s*(?:,\s*₹?\s*([0-9.]+))?\s*\)?/gi;
+  let match;
+  let foundAny = false;
+
+  while ((match = regex.exec(goldType)) !== null) {
+    items.push({
+      purity: match[1].toUpperCase(),
+      weight: `${match[2]}g`,
+      estimate: match[3] ? `₹${Number(match[3]).toLocaleString('en-IN')}` : undefined
+    });
+    foundAny = true;
+  }
+
+  if (!foundAny) {
+    const purities = goldType.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    if (purities.length === 1) {
+      items.push({ purity: purities[0], weight: `${goldWeight || 0}g` });
+    } else {
+      purities.forEach(p => {
+        items.push({ purity: p, weight: 'N/A' });
+      });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1 mt-1">
+      {items.map((item, idx) => (
+        <div key={idx} className="flex items-center gap-2">
+          <span className="font-extrabold text-slate-705 bg-amber-500/10 text-amber-800 border border-amber-500/20 px-2 py-0.5 rounded-lg text-[10px]">
+            {item.purity}
+          </span>
+          <span className="font-bold text-slate-700 text-xs">
+            {item.weight} {item.estimate ? `(${item.estimate})` : ''}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function RMDashboard() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [loading, setLoading] = useState<boolean>(true);
@@ -169,10 +213,27 @@ export default function RMDashboard() {
 
   const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
     const token = localStorage.getItem('siva_token');
-    if (!token) {
+    const userStr = localStorage.getItem('siva_user');
+    if (!token || !userStr) {
       localStorage.removeItem('siva_user');
       window.location.href = '/';
       throw new Error('Authentication token missing. Logging out...');
+    }
+
+    try {
+      const user = JSON.parse(userStr);
+      if (user.role.toUpperCase() !== 'RM') {
+        window.location.href = '/';
+        throw new Error('Role mismatch. Redirecting to home...');
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes('Role mismatch')) {
+        throw err;
+      }
+      localStorage.removeItem('siva_token');
+      localStorage.removeItem('siva_user');
+      window.location.href = '/';
+      throw err;
     }
 
     const headers = {
@@ -946,8 +1007,8 @@ export default function RMDashboard() {
                           <span className="font-black text-slate-800 text-sm">{leadDetail.lead.gold_weight} g</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block mb-0.5">Gold Type</span>
-                          <span className="font-bold text-slate-800">{leadDetail.lead.gold_type || 'N/A'}</span>
+                          <span className="text-slate-400 block mb-0.5">Purity Breakdown</span>
+                          {renderGoldPurityWeights(leadDetail.lead.gold_type, leadDetail.lead.gold_weight)}
                         </div>
                         <div className="col-span-2">
                           <span className="text-slate-400 block mb-0.5">Estimated Value</span>

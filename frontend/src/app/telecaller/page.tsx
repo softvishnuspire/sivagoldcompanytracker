@@ -76,8 +76,8 @@ export default function TelecallerDashboard() {
       id: doc.id,
       leadId: doc.lead_id,
       documentType: doc.document_type,
-      fileName: doc.file_url.split('/').pop() || 'document.pdf',
-      fileUrl: doc.file_url,
+      fileName: (doc.file_url || '').split('/').pop() || 'document.pdf',
+      fileUrl: doc.file_url || '',
       uploadedBy: doc.uploaded_by,
       createdAt: doc.created_at
     }));
@@ -132,10 +132,27 @@ export default function TelecallerDashboard() {
   // Authenticated fetch helper with JWT token
   const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
     const token = localStorage.getItem('siva_token');
-    if (!token) {
+    const userStr = localStorage.getItem('siva_user');
+    if (!token || !userStr) {
       localStorage.removeItem('siva_user');
       window.location.href = '/';
       throw new Error('Authentication token missing. Logging out...');
+    }
+
+    try {
+      const user = JSON.parse(userStr);
+      if (user.role.toUpperCase() !== 'TELECALLER') {
+        window.location.href = '/';
+        throw new Error('Role mismatch. Redirecting to home...');
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes('Role mismatch')) {
+        throw err;
+      }
+      localStorage.removeItem('siva_token');
+      localStorage.removeItem('siva_user');
+      window.location.href = '/';
+      throw err;
     }
 
     const headers = {
@@ -188,6 +205,18 @@ export default function TelecallerDashboard() {
       const dbLeads = await res.json();
       setDbConnected(true);
       return dbLeads.map(mapDbToLead);
+    },
+    enabled: !!currentUser,
+  });
+
+  const { data: leadSourcesList = [] } = useQuery<any[]>({
+    queryKey: ['telecaller', 'leadSources'],
+    queryFn: async () => {
+      const res = await authenticatedFetch(`${API_BASE}/lead-sources`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch lead sources');
+      }
+      return await res.json();
     },
     enabled: !!currentUser,
   });
@@ -392,9 +421,19 @@ export default function TelecallerDashboard() {
     toast.error('Lead deletion is not supported yet. Contact your administrator.');
   };
 
-  const handleEditLeadTrigger = (lead: Lead) => {
-    setEditingLead(lead);
-    setActiveTab('add-lead');
+  const handleEditLeadTrigger = async (lead: Lead) => {
+    try {
+      const res = await authenticatedFetch(`${API_BASE}/telecaller/leads/${lead.id}`);
+      if (!res.ok) {
+        throw new Error('Failed to load lead details from backend server.');
+      }
+      const fullLead = await res.json();
+      setEditingLead(mapDbToLead(fullLead));
+      setActiveTab('add-lead');
+    } catch (err: any) {
+      console.error('Fetch full lead details failed:', err);
+      toast.error(err.message || 'Failed to load lead details.');
+    }
   };
 
   const stats = getStats();
@@ -678,6 +717,7 @@ export default function TelecallerDashboard() {
                 <LeadForm
                   onSave={handleSaveLead}
                   editingLead={editingLead}
+                  leadSources={leadSourcesList.map((s: any) => s.source_name)}
                   onCancel={() => {
                     setActiveTab('leads-list');
                     setEditingLead(null);

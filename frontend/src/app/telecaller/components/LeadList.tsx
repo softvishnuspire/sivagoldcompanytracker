@@ -88,11 +88,11 @@ export default function LeadList({ leads, onEdit, onUpdateStatus, onAddFollowup,
   // Search and filter logic
   const filteredLeads = leads.filter(lead => {
     const matchesSearch = 
-      lead.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.mobile.includes(searchTerm) ||
-      lead.leadNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.bankName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.district.toLowerCase().includes(searchTerm.toLowerCase());
+      (lead.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.mobile || '').includes(searchTerm) ||
+      (lead.leadNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.bankName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.district || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'ALL' || lead.status === statusFilter;
     const matchesDistrict = districtFilter === 'ALL' || lead.district === districtFilter;

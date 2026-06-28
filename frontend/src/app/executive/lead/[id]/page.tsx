@@ -110,6 +110,50 @@ const getActiveStepIndex = (status: string): number => {
   }
 };
 
+const renderGoldPurityWeights = (goldType: string | undefined, goldWeight: number) => {
+  if (!goldType) return <span className="font-bold text-slate-800">N/A</span>;
+
+  const items: { purity: string; weight: string; estimate?: string }[] = [];
+  const regex = /(\d+K)\s*\(?\s*([0-9.]+)\s*g?\s*(?:,\s*₹?\s*([0-9.]+))?\s*\)?/gi;
+  let match;
+  let foundAny = false;
+
+  while ((match = regex.exec(goldType)) !== null) {
+    items.push({
+      purity: match[1].toUpperCase(),
+      weight: `${match[2]}g`,
+      estimate: match[3] ? `₹${Number(match[3]).toLocaleString('en-IN')}` : undefined
+    });
+    foundAny = true;
+  }
+
+  if (!foundAny) {
+    const purities = goldType.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    if (purities.length === 1) {
+      items.push({ purity: purities[0], weight: `${goldWeight || 0}g` });
+    } else {
+      purities.forEach(p => {
+        items.push({ purity: p, weight: 'N/A' });
+      });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1 mt-1">
+      {items.map((item, idx) => (
+        <div key={idx} className="flex items-center justify-end gap-2">
+          <span className="font-extrabold text-slate-705 bg-amber-500/10 text-amber-800 border border-amber-500/20 px-2 py-0.5 rounded-lg text-[10px]">
+            {item.purity}
+          </span>
+          <span className="font-bold text-slate-700 text-xs">
+            {item.weight} {item.estimate ? `(${item.estimate})` : ''}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function LeadDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id: leadId } = use(params);
@@ -512,9 +556,11 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                   <span className="text-slate-450">Weight</span>
                   <span className="text-slate-800 font-bold">{lead.gold_weight ? `${lead.gold_weight}g` : 'N/A'}</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-450">Type</span>
-                  <span className="text-slate-800 font-bold">{lead.gold_type || 'N/A'}</span>
+                <div className="flex justify-between border-b border-slate-100 pb-2 items-start">
+                  <span className="text-slate-450">Purity Breakdown</span>
+                  <div className="text-slate-800 font-bold text-right">
+                    {renderGoldPurityWeights(lead.gold_type, lead.gold_weight || 0)}
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-450">Estimated Value</span>

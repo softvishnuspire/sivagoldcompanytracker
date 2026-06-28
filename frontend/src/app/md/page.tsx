@@ -129,6 +129,7 @@ interface DashboardStats {
   activeCases: number;
   completedCases: number;
   goldCollectedToday: number;
+  goldCollectedTodayBreakdown?: string;
   revenueToday: number;
   conversionRate: number;
 }
@@ -169,6 +170,50 @@ const getActiveStepIndex = (status: string): number => {
   }
 };
 
+const renderGoldPurityWeights = (goldType: string | undefined, goldWeight: number) => {
+  if (!goldType) return <span className="font-bold text-slate-800">N/A</span>;
+
+  const items: { purity: string; weight: string; estimate?: string }[] = [];
+  const regex = /(\d+K)\s*\(?\s*([0-9.]+)\s*g?\s*(?:,\s*₹?\s*([0-9.]+))?\s*\)?/gi;
+  let match;
+  let foundAny = false;
+
+  while ((match = regex.exec(goldType)) !== null) {
+    items.push({
+      purity: match[1].toUpperCase(),
+      weight: `${match[2]}g`,
+      estimate: match[3] ? `₹${Number(match[3]).toLocaleString('en-IN')}` : undefined
+    });
+    foundAny = true;
+  }
+
+  if (!foundAny) {
+    const purities = goldType.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    if (purities.length === 1) {
+      items.push({ purity: purities[0], weight: `${goldWeight || 0}g` });
+    } else {
+      purities.forEach(p => {
+        items.push({ purity: p, weight: 'N/A' });
+      });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1 mt-1">
+      {items.map((item, idx) => (
+        <div key={idx} className="flex items-center gap-2">
+          <span className="font-extrabold text-slate-705 bg-amber-500/10 text-amber-800 border border-amber-500/20 px-2 py-0.5 rounded-lg text-[10px]">
+            {item.purity}
+          </span>
+          <span className="font-bold text-slate-700 text-xs">
+            {item.weight} {item.estimate ? `(${item.estimate})` : ''}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function MDDashboard() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [loading, setLoading] = useState<boolean>(true);
@@ -189,6 +234,7 @@ export default function MDDashboard() {
   const [branchPerformance, setBranchPerformance] = useState<any[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [expenseData, setExpenseData] = useState<any>({ totalExpenses: 0, executiveSummary: [], logs: [] });
+  const [leadSources, setLeadSources] = useState<any[]>([]);
 
   // Search, filters, inputs
   const [leadsSearch, setLeadsSearch] = useState('');
@@ -211,6 +257,20 @@ export default function MDDashboard() {
   const [fundRemarksInput, setFundRemarksInput] = useState<string>('');
   const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('Discrepancy in documentation');
 
+  // RM Approval forms and states (for MD to perform RM approvals)
+  const [actionType, setActionType] = useState<'approve' | 'reverify' | 'reject' | 'assign' | null>(null);
+  const [remarks, setRemarks] = useState('');
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [reverifyReason, setReverifyReason] = useState('Missing Gold Weight Slip');
+  const [reverifyReqInfo, setReverifyReqInfo] = useState('');
+  const [rejectReason, setRejectReason] = useState('Purity discrepancy');
+  const [selectedExecutiveId, setSelectedExecutiveId] = useState('');
+  const [pendingRMLeads, setPendingRMLeads] = useState<Lead[]>([]);
+  const [approvedRMLeads, setApprovedRMLeads] = useState<any[]>([]);
+
+  // Branch forms
+  const [isAddBranchModalOpen, setIsAddBranchModalOpen] = useState<boolean>(false);
+  const [newBranchData, setNewBranchData] = useState({ branch_name: '', city: '', state: '', address: '' });
 
   // Employee Management
   const [employeesList, setEmployeesList] = useState<any[]>([]);
@@ -222,10 +282,27 @@ export default function MDDashboard() {
 
   const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
     const token = localStorage.getItem('siva_token');
-    if (!token) {
+    const userStr = localStorage.getItem('siva_user');
+    if (!token || !userStr) {
       localStorage.removeItem('siva_user');
       window.location.href = '/';
       throw new Error('Authentication token missing. Logging out...');
+    }
+
+    try {
+      const user = JSON.parse(userStr);
+      if (user.role.toUpperCase() !== 'MD') {
+        window.location.href = '/';
+        throw new Error('Role mismatch. Redirecting to home...');
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes('Role mismatch')) {
+        throw err;
+      }
+      localStorage.removeItem('siva_token');
+      localStorage.removeItem('siva_user');
+      window.location.href = '/';
+      throw err;
     }
 
     const headers = {
@@ -272,6 +349,30 @@ export default function MDDashboard() {
       console.error(err);
     } finally {
       if (!quiet) setLoading(false);
+    }
+  };
+
+  const fetchRMVerifyLeads = async () => {
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/rm/pending-leads');
+      if (res.ok) {
+        const data = await res.json();
+        setPendingRMLeads(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching pending RM leads:', err);
+    }
+  };
+
+  const fetchRMApprovedLeads = async () => {
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/rm/approved-leads');
+      if (res.ok) {
+        const data = await res.json();
+        setApprovedRMLeads(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching approved RM leads:', err);
     }
   };
 
@@ -382,6 +483,21 @@ export default function MDDashboard() {
     }
   };
 
+  const fetchLeadSources = async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/md/lead-sources');
+      if (res.ok) {
+        const data = await res.json();
+        setLeadSources(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  };
+
   const loadDashboardData = async (quiet = false) => {
     if (!quiet) setLoading(true);
     try {
@@ -468,6 +584,24 @@ export default function MDDashboard() {
       fetchLeads();
     } else if (activeTab === 'funds') {
       fetchFundRequests();
+    } else if (activeTab === 'rm-approvals') {
+      setLoading(true);
+      const loadRMApprovals = async () => {
+        try {
+          await fetchRMVerifyLeads();
+          await fetchRMApprovedLeads();
+          const res = await authenticatedFetch('http://localhost:5000/api/md/employees');
+          if (res.ok) {
+            const data = await res.json();
+            setEmployeesList(data);
+          }
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setLoading(false);
+        }
+      };
+      loadRMApprovals();
     } else if (activeTab === 'revenue') {
       fetchRevenueData();
     } else if (activeTab === 'gold') {
@@ -485,6 +619,8 @@ export default function MDDashboard() {
       fetchExpenseData();
     } else if (activeTab === 'document-manager') {
       setLoading(false);
+    } else if (activeTab === 'lead-sources') {
+      fetchLeadSources();
     }
   }, [activeTab]);
 
@@ -563,7 +699,168 @@ export default function MDDashboard() {
     }
   };
 
+  const handleApproveLead = async () => {
+    if (!selectedLeadId) return;
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/rm/approve', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: selectedLeadId,
+          remarks,
+          approvalNotes
+        })
+      });
 
+      if (res.ok) {
+        toast.success("Lead Approved Successfully");
+        setActionType(null);
+        setRemarks('');
+        setApprovalNotes('');
+        closeInspection();
+        if (activeTab === 'rm-approvals') {
+          fetchRMVerifyLeads();
+          fetchRMApprovedLeads();
+        } else if (activeTab === 'leads') {
+          fetchLeads();
+        }
+        fetchDashboardStats();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to approve lead");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to approve lead");
+    }
+  };
+
+  const handleReverifyLead = async () => {
+    if (!selectedLeadId) return;
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/rm/reverify', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: selectedLeadId,
+          reason: reverifyReason,
+          requiredInformation: reverifyReqInfo,
+          remarks
+        })
+      });
+
+      if (res.ok) {
+        toast.success("Lead Reverification Sent");
+        setActionType(null);
+        setRemarks('');
+        setReverifyReqInfo('');
+        closeInspection();
+        if (activeTab === 'rm-approvals') {
+          fetchRMVerifyLeads();
+          fetchRMApprovedLeads();
+        } else if (activeTab === 'leads') {
+          fetchLeads();
+        }
+        fetchDashboardStats();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to reverify lead");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to reverify lead");
+    }
+  };
+
+  const handleRejectLead = async () => {
+    if (!selectedLeadId) return;
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/rm/reject', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId: selectedLeadId,
+          rejectionReason: rejectReason,
+          remarks
+        })
+      });
+
+      if (res.ok) {
+        toast.success("Lead Rejected Successfully");
+        setActionType(null);
+        setRemarks('');
+        closeInspection();
+        if (activeTab === 'rm-approvals') {
+          fetchRMVerifyLeads();
+          fetchRMApprovedLeads();
+        } else if (activeTab === 'leads') {
+          fetchLeads();
+        }
+        fetchDashboardStats();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to reject lead");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to reject lead");
+    }
+  };
+
+  const handleAssignExecutive = async (leadId: string, execId: string) => {
+    if (!leadId || !execId) return;
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/rm/assign-executive', {
+        method: 'POST',
+        body: JSON.stringify({
+          leadId,
+          executiveId: execId
+        })
+      });
+
+      if (res.ok) {
+        toast.success("Executive Assigned Successfully");
+        setActionType(null);
+        setSelectedExecutiveId('');
+        closeInspection();
+        if (activeTab === 'rm-approvals') {
+          fetchRMVerifyLeads();
+          fetchRMApprovedLeads();
+        } else if (activeTab === 'leads') {
+          fetchLeads();
+        }
+        fetchDashboardStats();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to assign executive");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to assign executive");
+    }
+  };
+
+  const handleAddBranch = async () => {
+    if (!newBranchData.branch_name) {
+      alert('Branch Name is required');
+      return;
+    }
+    try {
+      const res = await authenticatedFetch('http://localhost:5000/api/md/branch', {
+        method: 'POST',
+        body: JSON.stringify(newBranchData)
+      });
+      if (res.ok) {
+        toast.success("Branch Added Successfully");
+        setIsAddBranchModalOpen(false);
+        setNewBranchData({ branch_name: '', city: '', state: '', address: '' });
+        fetchBranchesList();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to add branch");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to add branch");
+    }
+  };
 
   const fetchEmployeesList = async () => {
     setLoading(true);
@@ -672,7 +969,7 @@ export default function MDDashboard() {
     document.body.removeChild(link);
   };
 
-  const filteredLeads = leads.filter(l => 
+  const filteredLeads = leads.filter(l =>
     l.customer_name.toLowerCase().includes(leadsSearch.toLowerCase()) ||
     l.lead_number.toLowerCase().includes(leadsSearch.toLowerCase()) ||
     (l.district && l.district.toLowerCase().includes(leadsSearch.toLowerCase()))
@@ -773,8 +1070,8 @@ export default function MDDashboard() {
 
   const sortedExecPerformanceList = empPerformance?.executive
     ? [...empPerformance.executive]
-        .sort((a, b) => b.completedCases - a.completedCases || b.goldCollected - a.goldCollected)
-        .slice(0, 5)
+      .sort((a, b) => b.completedCases - a.completedCases || b.goldCollected - a.goldCollected)
+      .slice(0, 5)
     : [];
 
   const dynamicAlertsList = (() => {
@@ -805,7 +1102,7 @@ export default function MDDashboard() {
 
   return (
     <div suppressHydrationWarning className="h-screen w-screen overflow-hidden flex bg-[#f4f5f8] text-slate-800 font-sans selection:bg-[#c3902c] selection:text-black">
-      
+
       {/* Backdrop overlay for mobile */}
       {isSidebarOpen && (
         <div
@@ -818,7 +1115,7 @@ export default function MDDashboard() {
           SIDEBAR PANEL (Burgundy Theme matching RM)
           =================================================================== */}
       <aside className={`fixed md:relative top-0 left-0 w-72 h-full bg-gradient-to-b from-[#4d0711] to-[#200206] border-r border-[#691823]/20 flex flex-col z-40 shrink-0 select-none transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        
+
         {/* Branding Header */}
         <div className="py-2 px-4 border-b border-[#691823]/20 flex flex-col items-center justify-center bg-[#4d0b13]/10">
           <div className="w-full h-36 flex items-center justify-center overflow-hidden">
@@ -840,6 +1137,7 @@ export default function MDDashboard() {
           {[
             { id: 'dashboard', label: 'Dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
             { id: 'leads', label: 'Lead Monitoring', icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' },
+            { id: 'rm-approvals', label: 'RM Approvals', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
             { id: 'funds', label: 'Fund Approvals', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
             { id: 'revenue', label: 'Revenue Reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 01-2 2h-2a2 2 0 01-2-2zm9-1h2a2 2 0 002-2v-3a2 2 0 00-2-2h-2a2 2 0 00-2 2v3a2 2 0 002 2zm-8-3H8v3h2v-3z' },
             { id: 'gold', label: 'Gold Collection', icon: 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z' },
@@ -849,6 +1147,7 @@ export default function MDDashboard() {
             { id: 'timeline', label: 'Case Timeline', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
             { id: 'expenses', label: 'Executive Expenses', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
             { id: 'document-manager', label: 'Document Manager', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
+            { id: 'lead-sources', label: 'Lead Sources', icon: 'M11 5L6 9H2v6h4l5 4V5z M15.5 8.4a5 5 0 010 7.2M18 6a8.5 8.5 0 010 12' },
             { id: 'reports', label: 'Reports', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' }
           ].map((item) => (
             <button
@@ -858,11 +1157,10 @@ export default function MDDashboard() {
                 closeInspection();
                 setIsSidebarOpen(false);
               }}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all group cursor-pointer ${
-                activeTab === item.id
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all group cursor-pointer ${activeTab === item.id
                   ? 'bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold'
                   : 'text-amber-100/60 hover:bg-[#c3902c]/10 hover:text-amber-300'
-              }`}
+                }`}
             >
               <svg className={`w-4 h-4 transition-colors ${activeTab === item.id ? 'text-amber-400' : 'text-amber-100/40 group-hover:text-amber-300'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={item.icon} />
@@ -900,7 +1198,7 @@ export default function MDDashboard() {
           WORKSPACE WORKSPACE
           =================================================================== */}
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        
+
         {/* Header Toolbar */}
         <header className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3 sm:py-4 flex items-center justify-between z-20 shadow-sm">
           <div className="flex items-center gap-1.5 sm:gap-3">
@@ -944,7 +1242,7 @@ export default function MDDashboard() {
 
         {/* Dashboard Panels */}
         <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
-          
+
           {loading ? (
             <div className="space-y-6">
               {activeTab === 'dashboard' ? (
@@ -977,26 +1275,58 @@ export default function MDDashboard() {
               )}
             </div>
           ) : inspecting && leadDetail ? (
-            
+
             /* =============================================================
                LEAD INSPECTION VIEW (LEAD DETAILS PAGE)
                ============================================================= */
             <div className="flex flex-col gap-6 animate-fadeIn">
-              <div className="flex justify-between items-center bg-white p-4 border border-slate-200 shadow-sm rounded-2xl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 border border-slate-200/80 shadow-sm rounded-2xl gap-4">
                 <button
                   onClick={closeInspection}
-                  className="flex items-center gap-2 text-sm font-bold text-amber-600 hover:text-amber-700 cursor-pointer"
+                  className="flex items-center gap-2 text-sm font-bold text-amber-650 hover:text-amber-700 cursor-pointer"
                 >
                   ← Back to List
                 </button>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-3 flex-wrap">
                   {getStatusBadge(leadDetail.lead.current_status)}
+
+                  {leadDetail.lead.current_status === 'SENT_TO_RM' && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setActionType('reverify')}
+                        className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-[10px] font-bold hover:bg-blue-700 active:scale-95 transition-all cursor-pointer shadow-md text-center"
+                      >
+                        🔁 Re-Verify
+                      </button>
+                      <button
+                        onClick={() => setActionType('reject')}
+                        className="px-3 py-1.5 bg-rose-600 text-white rounded-xl text-[10px] font-bold hover:bg-rose-700 active:scale-95 transition-all cursor-pointer shadow-md text-center"
+                      >
+                        ❌ Reject
+                      </button>
+                      <button
+                        onClick={() => setActionType('approve')}
+                        className="px-3 py-1.5 bg-[#c3902c] text-white rounded-xl text-[10px] font-bold hover:bg-amber-650 active:scale-95 transition-all cursor-pointer shadow-md text-center"
+                      >
+                        ✓ Approve
+                      </button>
+                    </div>
+                  )}
+
+                  {leadDetail.lead.current_status === 'RM_APPROVED' && (
+                    <button
+                      onClick={() => setActionType('assign')}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-bold hover:bg-indigo-700 active:scale-95 transition-all cursor-pointer shadow-md text-center"
+                    >
+                      👤 Assign Executive
+                    </button>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 flex flex-col gap-6">
-                  
+
                   {/* Grid fields */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     {/* Customer info */}
@@ -1031,8 +1361,8 @@ export default function MDDashboard() {
                           <span className="font-bold text-slate-800">{leadDetail.lead.gold_weight} g</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block mb-0.5">Gold Type</span>
-                          <span className="font-bold text-slate-800">{leadDetail.lead.gold_type || 'N/A'}</span>
+                          <span className="text-slate-400 block mb-0.5">Purity Breakdown</span>
+                          {renderGoldPurityWeights(leadDetail.lead.gold_type, leadDetail.lead.gold_weight)}
                         </div>
                         <div className="col-span-2">
                           <span className="text-slate-400 block mb-0.5">Estimated Value</span>
@@ -1094,11 +1424,10 @@ export default function MDDashboard() {
                               <button
                                 key={doc.id}
                                 onClick={() => setPreviewDoc(fileUrl)}
-                                className={`w-full flex items-center justify-between p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                                  previewDoc === fileUrl
+                                className={`w-full flex items-center justify-between p-3 rounded-xl border text-left cursor-pointer transition-all ${previewDoc === fileUrl
                                     ? 'bg-amber-500/5 border-amber-500/30 text-amber-700'
                                     : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-350'
-                                }`}
+                                  }`}
                               >
                                 <div className="flex flex-col gap-0.5 min-w-0">
                                   <span className="text-xs font-bold truncate">
@@ -1278,22 +1607,20 @@ export default function MDDashboard() {
                           return (
                             <div
                               key={step.status}
-                              className={`relative flex items-center justify-between p-2.5 rounded-xl border transition-all duration-300 ${
-                                isActive 
-                                  ? 'bg-amber-50/50 border-amber-500/40 text-amber-900 shadow-sm font-bold' 
-                                  : isCompleted 
-                                    ? 'bg-emerald-50/20 border-emerald-200/20 text-slate-600' 
+                              className={`relative flex items-center justify-between p-2.5 rounded-xl border transition-all duration-300 ${isActive
+                                  ? 'bg-amber-50/50 border-amber-500/40 text-amber-900 shadow-sm font-bold'
+                                  : isCompleted
+                                    ? 'bg-emerald-50/20 border-emerald-200/20 text-slate-600'
                                     : 'bg-slate-50/20 border-slate-100 text-slate-400 opacity-60'
-                              }`}
+                                }`}
                             >
                               <div className="flex items-center gap-2.5">
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${
-                                  isActive 
-                                    ? 'bg-amber-500 text-white font-extrabold shadow-sm animate-pulse' 
-                                    : isCompleted 
-                                      ? 'bg-emerald-500 text-white' 
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${isActive
+                                    ? 'bg-amber-500 text-white font-extrabold shadow-sm animate-pulse'
+                                    : isCompleted
+                                      ? 'bg-emerald-500 text-white'
                                       : 'bg-slate-100 text-slate-400'
-                                }`}>
+                                  }`}>
                                   {isCompleted ? '✓' : step.icon}
                                 </div>
                                 <span className={`text-[11px] ${isActive ? 'font-bold text-amber-800' : 'font-medium'}`}>
@@ -1346,16 +1673,16 @@ export default function MDDashboard() {
               </div>
             </div>
           ) : (
-            
+
             /* =============================================================
                STANDARD TABS VIEW
                ============================================================= */
             <div>
-              
+
               {/* 1. DASHBOARD PAGE */}
               {activeTab === 'dashboard' && stats && (
                 <div className="flex flex-col gap-8 animate-fadeIn">
-                  
+
                   {/* Top Summary Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
                     {[
@@ -1364,7 +1691,7 @@ export default function MDDashboard() {
                       { title: 'RM Approved Leads', val: stats.rmApprovedLeads, icon: '✅', bg: 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' },
                       { title: 'Active Cases', val: stats.activeCases, icon: '🔥', bg: 'bg-orange-500/10 text-orange-600 border border-orange-500/20' },
                       { title: 'Completed Cases', val: stats.completedCases, icon: '🏆', bg: 'bg-teal-500/10 text-teal-600 border border-teal-500/20' },
-                      { title: 'Gold Collected Today', val: `${stats.goldCollectedToday} g`, icon: '🌟', bg: 'bg-amber-500/10 text-amber-600 border border-amber-500/20' },
+                      { title: 'Gold Collected Today', val: `${stats.goldCollectedToday} g`, subtext: stats.goldCollectedTodayBreakdown, icon: '🌟', bg: 'bg-amber-500/10 text-amber-600 border border-amber-500/20' },
                       { title: 'Revenue Today', val: `₹${stats.revenueToday.toLocaleString('en-IN')}`, icon: '💰', bg: 'bg-green-500/10 text-green-600 border border-green-500/20' },
                       { title: 'Conversion Rate', val: `${stats.conversionRate}%`, icon: '📈', bg: 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/20' }
                     ].map((card, idx) => (
@@ -1372,6 +1699,11 @@ export default function MDDashboard() {
                         <div className="flex flex-col gap-1.5">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{card.title}</span>
                           <span className="text-2xl font-black text-slate-900">{card.val}</span>
+                          {card.subtext && (
+                            <span className="text-[10px] text-amber-600 bg-amber-500/5 border border-amber-550/10 px-2 py-0.5 rounded-lg font-bold mt-1 max-w-max select-none">
+                              {card.subtext}
+                            </span>
+                          )}
                         </div>
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg ${card.bg}`}>
                           {card.icon}
@@ -1382,21 +1714,21 @@ export default function MDDashboard() {
 
                   {/* MAIN DASHBOARD WIDGETS (12-col grid) */}
                   <div className="grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12 gap-4 sm:gap-6 mt-2">
-                    
+
                     {/* Row 1: Funnel, Summary, Exec Status */}
                     {/* Business Funnel */}
                     <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 col-span-1 md:col-span-3 xl:col-span-3 flex flex-col h-full">
                       <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Business Funnel (Today)</h3>
                       <div className="flex flex-col w-full gap-1 mt-2 flex-1 justify-center">
                         {funnelStages.map((stage, idx) => {
-                          const topInset = idx * 6; 
+                          const topInset = idx * 6;
                           const botInset = (idx + 1) * 6;
                           return (
                             <div key={idx} className="flex items-center w-full relative">
                               <div className="w-[120px] xl:w-[140px] shrink-0 h-9 relative flex items-center justify-center text-white font-bold text-[10px] shadow-sm group cursor-pointer"
-                                   style={{ 
-                                     clipPath: `polygon(${topInset}% 0%, ${100 - topInset}% 0%, ${100 - botInset}% 100%, ${botInset}% 100%)`
-                                    }}
+                                style={{
+                                  clipPath: `polygon(${topInset}% 0%, ${100 - topInset}% 0%, ${100 - botInset}% 100%, ${botInset}% 100%)`
+                                }}
                               >
                                 <div className={`absolute inset-0 ${stage.color} group-hover:opacity-90 transition-opacity`} />
                                 <span className="relative z-10">{stage.value}</span>
@@ -1499,14 +1831,14 @@ export default function MDDashboard() {
                       </div>
                       <div className="h-[220px] w-full mt-2">
                         {isClient && (
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <LineChart data={revenueData.trend && revenueData.trend.length > 0 ? revenueData.trend : []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                               <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                              <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v/100000}L`} />
-                              <Tooltip 
+                              <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v / 100000}L`} />
+                              <Tooltip
                                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                formatter={(value) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Revenue']} 
+                                formatter={(value) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Revenue']}
                               />
                               <Line type="monotone" dataKey="revenue" stroke="#4d0711" strokeWidth={3} activeDot={{ r: 6, fill: '#c3902c', stroke: '#fff', strokeWidth: 2 }} dot={false} />
                             </LineChart>
@@ -1520,7 +1852,7 @@ export default function MDDashboard() {
                       <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Lead Sources (This Month)</h3>
                       <div className="h-[180px] w-full relative">
                         {isClient && leadSourcesList.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <PieChart>
                               <Pie
                                 data={leadSourcesList}
@@ -1550,13 +1882,13 @@ export default function MDDashboard() {
                         )}
                       </div>
                       <div className="mt-2 flex flex-col gap-1.5">
-                        {leadSourcesList.slice(0,3).map((item, i) => (
+                        {leadSourcesList.slice(0, 3).map((item, i) => (
                           <div key={i} className="flex justify-between items-center text-[10px]">
                             <div className="flex items-center gap-1.5">
                               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                               <span className="font-medium text-slate-600">{item.name}</span>
                             </div>
-                            <span className="font-bold text-slate-800">{item.value} <span className="text-slate-400">({leads.length > 0 ? Math.round(item.value/leads.length*100) : 0}%)</span></span>
+                            <span className="font-bold text-slate-800">{item.value} <span className="text-slate-400">({leads.length > 0 ? Math.round(item.value / leads.length * 100) : 0}%)</span></span>
                           </div>
                         ))}
                         <button className="text-[10px] font-bold text-amber-600 hover:underline text-center mt-1 cursor-pointer">View Full Report →</button>
@@ -1763,10 +2095,9 @@ export default function MDDashboard() {
                               <td className="p-4 font-semibold text-slate-700">{r.requested_by_user?.name || 'Executive'}</td>
                               <td className="p-4 text-slate-400">{new Date(r.created_at).toLocaleDateString()}</td>
                               <td className="p-4">
-                                <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase ${
-                                  r.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
-                                  r.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                                }`}>
+                                <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase ${r.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                                    r.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                  }`}>
                                   {r.status}
                                 </span>
                               </td>
@@ -1797,10 +2128,142 @@ export default function MDDashboard() {
                 </div>
               )}
 
+              {/* RM APPROVALS PAGE */}
+              {activeTab === 'rm-approvals' && (
+                <div className="flex flex-col gap-6 animate-fadeIn">
+                  {/* Section 1: Pending Verification */}
+                  <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 flex flex-col gap-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Leads Pending RM Verification</h3>
+                      <span className="text-xs text-slate-400 font-bold">
+                        Pending verification: {pendingRMLeads.length}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full min-w-[800px] border-collapse text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
+                            <th className="p-4">Lead ID</th>
+                            <th className="p-4">Customer Name</th>
+                            <th className="p-4">Mobile</th>
+                            <th className="p-4">District</th>
+                            <th className="p-4">Gold Weight</th>
+                            <th className="p-4">Loan Amount</th>
+                            <th className="p-4">Telecaller</th>
+                            <th className="p-4">Status</th>
+                            <th className="p-4 text-center">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {pendingRMLeads.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="p-8 text-center text-slate-400 italic">No leads pending verification.</td>
+                            </tr>
+                          ) : (
+                            pendingRMLeads.map((lead) => (
+                              <tr key={lead.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4 font-mono font-bold text-slate-650">{lead.lead_number}</td>
+                                <td className="p-4 font-extrabold text-slate-800">{lead.customer_name}</td>
+                                <td className="p-4 font-semibold text-slate-700">{lead.mobile}</td>
+                                <td className="p-4 font-medium text-slate-600">{lead.district || 'N/A'}</td>
+                                <td className="p-4 font-extrabold text-slate-700">{lead.gold_weight} g</td>
+                                <td className="p-4 font-bold text-slate-800">₹{lead.loan_amount?.toLocaleString('en-IN')}</td>
+                                <td className="p-4 font-medium text-slate-600">{lead.telecaller?.name || 'N/A'}</td>
+                                <td className="p-4">{getStatusBadge(lead.current_status)}</td>
+                                <td className="p-4 text-center">
+                                  <button
+                                    onClick={() => handleInspectLead(lead.id)}
+                                    className="px-3.5 py-1.5 bg-amber-500/10 border border-amber-500/25 text-amber-700 rounded-lg font-bold hover:bg-amber-500 hover:text-black transition-all cursor-pointer text-[10px]"
+                                  >
+                                    Verify
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Pending Executive Assignment */}
+                  <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 flex flex-col gap-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Leads Pending Executive Assignment</h3>
+                      <span className="text-xs text-slate-400 font-bold">
+                        Pending assignment: {approvedRMLeads.filter(l => l.current_status === 'RM_APPROVED').length}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <table className="w-full min-w-[800px] border-collapse text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
+                            <th className="p-4">Lead ID</th>
+                            <th className="p-4">Customer Name</th>
+                            <th className="p-4">District</th>
+                            <th className="p-4">Gold Weight</th>
+                            <th className="p-4">Loan Amount</th>
+                            <th className="p-4">Status</th>
+                            <th className="p-4">Executive Assignment</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {approvedRMLeads.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="p-8 text-center text-slate-400 italic">No approved leads.</td>
+                            </tr>
+                          ) : (
+                            approvedRMLeads.map((lead) => (
+                              <tr key={lead.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4 font-mono font-bold text-slate-650">{lead.lead_number}</td>
+                                <td className="p-4 font-extrabold text-slate-800">{lead.customer_name}</td>
+                                <td className="p-4 font-medium text-slate-600">{lead.district || 'N/A'}</td>
+                                <td className="p-4 font-extrabold text-slate-700">{lead.gold_weight} g</td>
+                                <td className="p-4 font-bold text-slate-800">₹{lead.loan_amount?.toLocaleString('en-IN')}</td>
+                                <td className="p-4">{getStatusBadge(lead.current_status)}</td>
+                                <td className="p-4">
+                                  {lead.current_status === 'RM_APPROVED' ? (
+                                    <div className="flex gap-2 items-center">
+                                      <select
+                                        value={selectedExecutiveId}
+                                        onChange={(e) => setSelectedExecutiveId(e.target.value)}
+                                        className="bg-white border border-slate-200 rounded-lg text-xs p-1.5 text-slate-650 focus:outline-none focus:border-amber-500"
+                                      >
+                                        <option value="">Select Executive</option>
+                                        {employeesList
+                                          .filter(emp => emp.role === 'EXECUTIVE' && emp.status === 'active')
+                                          .map(ex => (
+                                            <option key={ex.id} value={ex.id}>{ex.name}</option>
+                                          ))}
+                                      </select>
+                                      <button
+                                        onClick={() => handleAssignExecutive(lead.id, selectedExecutiveId)}
+                                        disabled={!selectedExecutiveId}
+                                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:pointer-events-none rounded-lg font-bold transition-all cursor-pointer shadow-md text-[10px]"
+                                      >
+                                        Assign
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-500 font-bold">Assigned to: {lead.executive?.name || 'Executive'}</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* 4. REVENUE REPORTS PAGE */}
               {activeTab === 'revenue' && (
                 <div className="flex flex-col gap-6 animate-fadeIn">
-                  
+
                   {/* Revenue Summary Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
                     {[
@@ -1830,7 +2293,7 @@ export default function MDDashboard() {
                             <LineChart data={revenueData.trend}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                               <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} />
-                              <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(v) => `₹${v/1000}k`} />
+                              <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(v) => `₹${v / 1000}k`} />
                               <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Revenue']} />
                               <Line type="monotone" dataKey="revenue" stroke="#4d0711" strokeWidth={3} activeDot={{ r: 6 }} dot={false} />
                             </LineChart>
@@ -1848,7 +2311,7 @@ export default function MDDashboard() {
                             <BarChart data={revenueData.comparison}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                               <XAxis dataKey="month" stroke="#94a3b8" fontSize={10} />
-                              <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(v) => `₹${v/1000}k`} />
+                              <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(v) => `₹${v / 1000}k`} />
                               <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Revenue']} />
                               <Bar dataKey="revenue" fill="#c3902c" radius={[4, 4, 0, 0]} />
                             </BarChart>
@@ -1863,7 +2326,7 @@ export default function MDDashboard() {
               {/* 5. GOLD COLLECTION PAGE */}
               {activeTab === 'gold' && (
                 <div className="flex flex-col gap-6 animate-fadeIn">
-                  
+
                   {/* Summary Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {[
@@ -1927,7 +2390,7 @@ export default function MDDashboard() {
               {/* 6. EMPLOYEE PERFORMANCE PAGE */}
               {activeTab === 'employees' && (
                 <div className="flex flex-col gap-8 animate-fadeIn">
-                  
+
                   {/* Telecallers Performance */}
                   <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6">
                     <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider border-b border-slate-100 pb-3 mb-4">Telecaller Performance</h3>
@@ -2062,7 +2525,7 @@ export default function MDDashboard() {
               {/* 8. CASE TIMELINE PAGE */}
               {activeTab === 'timeline' && (
                 <div className="flex flex-col gap-6 animate-fadeIn">
-                  
+
                   {/* Timeline filters */}
                   <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div className="flex flex-col gap-1">
@@ -2192,7 +2655,7 @@ export default function MDDashboard() {
                                 <span className={`px-2 py-1 rounded text-[10px] ${emp.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{emp.status}</span>
                               </td>
                               <td className="p-4 flex items-center justify-center gap-2">
-                                <button onClick={() => { setEmployeeForm({...emp, password: ''}); setIsEmployeeModalOpen(true); }} className="px-2 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded text-[10px] font-bold hover:bg-blue-100 cursor-pointer">Edit</button>
+                                <button onClick={() => { setEmployeeForm({ ...emp, password: '' }); setIsEmployeeModalOpen(true); }} className="px-2 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded text-[10px] font-bold hover:bg-blue-100 cursor-pointer">Edit</button>
                                 {emp.status === 'active' && (
                                   <button onClick={() => handleDeleteEmployee(emp.id)} className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-[10px] font-bold hover:bg-red-100 cursor-pointer">Deactivate</button>
                                 )}
@@ -2243,15 +2706,15 @@ export default function MDDashboard() {
                       >
                         📥 Export PDF
                       </button>
+                    </div>
                   </div>
-                </div>
                 </div>
               )}
 
               {/* 9.5 EXECUTIVE EXPENSES PAGE */}
               {activeTab === 'expenses' && (
                 <div className="flex flex-col gap-8 animate-fadeIn">
-                  
+
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Executive Expenses Tracker</h3>
                     <button
@@ -2273,12 +2736,12 @@ export default function MDDashboard() {
                         ₹
                       </div>
                     </div>
-                    
+
                     <div className="bg-white border border-slate-200 shadow-sm rounded-3xl p-6 flex items-center justify-between">
                       <div className="flex flex-col gap-1">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Average Expense per Case</span>
                         <span className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
-                          ₹{expenseData.logs?.length > 0 
+                          ₹{expenseData.logs?.length > 0
                             ? Math.round(Number(expenseData.totalExpenses || 0) / expenseData.logs.length).toLocaleString('en-IN')
                             : '0'}
                         </span>
@@ -2290,7 +2753,7 @@ export default function MDDashboard() {
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    
+
                     {/* Left: Summary Table */}
                     <div className="lg:col-span-2 bg-white border border-slate-200 shadow-sm rounded-3xl p-6 flex flex-col gap-4">
                       <h3 className="text-xs font-bold text-[#4d0711] uppercase tracking-wider border-b border-slate-100 pb-3">Expenses by Executive</h3>
@@ -2331,11 +2794,11 @@ export default function MDDashboard() {
                         {expenseData.executiveSummary?.length === 0 ? (
                           <span className="text-xs text-slate-400 italic">No chart data available</span>
                         ) : (
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <BarChart data={expenseData.executiveSummary}>
                               <XAxis dataKey="name" stroke="#88868A" fontSize={10} tickLine={false} />
                               <YAxis stroke="#88868A" fontSize={10} tickLine={false} axisLine={false} />
-                              <Tooltip 
+                              <Tooltip
                                 formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Expenses']}
                                 contentStyle={{ background: '#3D1510', border: '1px solid #65483B', borderRadius: '12px', color: '#D9D9DA', fontSize: '11px' }}
                               />
@@ -2388,9 +2851,137 @@ export default function MDDashboard() {
                 </div>
               )}
 
-            {activeTab === 'document-manager' && (
-              <DocumentManager />
-            )}
+              {activeTab === 'document-manager' && (
+                <DocumentManager />
+              )}
+
+              {activeTab === 'lead-sources' && (
+                <div className="space-y-6 animate-fadeIn text-slate-800">
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Lead Sources</h1>
+                    <p className="text-slate-500 text-xs sm:text-sm mt-1">Configure the channels where customers hear about Shiva Gold Company. These options populate the Telecaller Lead Creation panel.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                    
+                    {/* Add Lead Source Form */}
+                    <div className="md:col-span-1 bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 flex flex-col gap-4 animate-scaleUp">
+                      <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide border-b border-slate-100 pb-2">
+                        Add New Source
+                      </h3>
+                      
+                      <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const form = e.currentTarget;
+                        const input = form.elements.namedItem('sourceName') as HTMLInputElement;
+                        const sourceName = input.value;
+                        if (!sourceName.trim()) return;
+
+                        try {
+                          const res = await authenticatedFetch('http://localhost:5000/api/md/lead-sources', {
+                            method: 'POST',
+                            body: JSON.stringify({ source_name: sourceName })
+                          });
+                          if (res.ok) {
+                            input.value = '';
+                            fetchLeadSources(true);
+                          } else {
+                            const err = await res.json();
+                            alert(`Error: ${err.error}`);
+                          }
+                        } catch (err) {
+                          alert('Failed to connect to backend server.');
+                        }
+                      }} className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Source Name</label>
+                          <input
+                            type="text"
+                            name="sourceName"
+                            placeholder="e.g. Instagram Ads, Radio, Newspaper"
+                            required
+                            className="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 placeholder-slate-400/70"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full bg-[#c3902c] hover:bg-amber-600 text-white font-extrabold text-xs py-3 rounded-xl cursor-pointer shadow-md transition-all active:scale-95 text-center"
+                        >
+                          ➕ Add Channel
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Lead Sources Directory List */}
+                    <div className="md:col-span-2 bg-white border border-slate-200/80 shadow-sm rounded-3xl p-6 flex flex-col gap-4 animate-scaleUp">
+                      <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide border-b border-slate-100 pb-2">
+                        Active Channels
+                      </h3>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold text-xs uppercase tracking-wider">
+                              <th className="p-4">Channel Name</th>
+                              <th className="p-4">Status</th>
+                              <th className="p-4 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-xs">
+                            {leadSources.length === 0 ? (
+                              <tr>
+                                <td colSpan={3} className="p-8 text-center text-slate-400 italic">No channels found.</td>
+                              </tr>
+                            ) : (
+                              leadSources.map((source: any) => (
+                                <tr key={source.id} className="hover:bg-slate-50/50">
+                                  <td className="p-4 font-bold text-slate-800 text-sm">{source.source_name}</td>
+                                  <td className="p-4">
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                      source.status === 'active' 
+                                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
+                                        : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                    }`}>
+                                      {source.status}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-right">
+                                    {source.status === 'active' && (
+                                      <button
+                                        onClick={async () => {
+                                          if (confirm(`Are you sure you want to delete or deactivate the source "${source.source_name}"?`)) {
+                                            try {
+                                              const res = await authenticatedFetch(`http://localhost:5000/api/md/lead-sources/${source.id}`, {
+                                                method: 'DELETE'
+                                              });
+                                              if (res.ok) {
+                                                fetchLeadSources(true);
+                                              } else {
+                                                const err = await res.json();
+                                                alert(`Error: ${err.error}`);
+                                              }
+                                            } catch (err) {
+                                              alert('Failed to connect to backend server.');
+                                            }
+                                          }
+                                        }}
+                                        className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded-lg text-[10px] font-bold cursor-pointer transition-colors border border-rose-200"
+                                      >
+                                        Deactivate
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
@@ -2404,7 +2995,7 @@ export default function MDDashboard() {
       {fundModalType && activeFundRequest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col gap-4 animate-scaleUp">
-            
+
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide">
                 {fundModalType === 'approve' ? 'Approve Fund Request' : 'Reject Fund Request'}
@@ -2495,110 +3086,385 @@ export default function MDDashboard() {
         </div>
       )}
 
+      {/* ADD BRANCH MODAL */}
+      {isAddBranchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl flex flex-col gap-4 animate-scaleUp">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+              <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide">Add New Branch</h3>
+              <button onClick={() => setIsAddBranchModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
+            </div>
 
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Branch Name *</label>
+                <input
+                  type="text"
+                  value={newBranchData.branch_name}
+                  onChange={(e) => setNewBranchData({ ...newBranchData, branch_name: e.target.value })}
+                  placeholder="e.g. Mumbai"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
+                />
+              </div>
 
-  {/* ADD/EDIT EMPLOYEE MODAL */}
-  {isEmployeeModalOpen && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl flex flex-col gap-4 animate-scaleUp">
-        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-          <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide">
-            {employeeForm.id ? 'Edit Employee' : 'Create New Employee'}
-          </h3>
-          <button onClick={() => setIsEmployeeModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">City</label>
+                <input
+                  type="text"
+                  value={newBranchData.city}
+                  onChange={(e) => setNewBranchData({ ...newBranchData, city: e.target.value })}
+                  placeholder="e.g. Mumbai"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">State</label>
+                <input
+                  type="text"
+                  value={newBranchData.state}
+                  onChange={(e) => setNewBranchData({ ...newBranchData, state: e.target.value })}
+                  placeholder="e.g. Maharashtra"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Address</label>
+                <textarea
+                  value={newBranchData.address}
+                  onChange={(e) => setNewBranchData({ ...newBranchData, address: e.target.value })}
+                  placeholder="Full branch address..."
+                  rows={2}
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500 transition-all resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <button
+                onClick={() => setIsAddBranchModalOpen(false)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddBranch}
+                className="w-full py-2.5 bg-[#4d0711] hover:bg-[#2e040a] text-amber-400 font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                Save Branch
+              </button>
+            </div>
+          </div>
         </div>
+      )}
 
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Branch *</label>
-            <select
-              value={employeeForm.branch_id}
-              onChange={(e) => setEmployeeForm({ ...employeeForm, branch_id: e.target.value })}
-              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+      {/* ADD/EDIT EMPLOYEE MODAL */}
+      {isEmployeeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl flex flex-col gap-4 animate-scaleUp">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+              <h3 className="text-sm font-extrabold uppercase text-[#4d0711] tracking-wide">
+                {employeeForm.id ? 'Edit Employee' : 'Create New Employee'}
+              </h3>
+              <button onClick={() => setIsEmployeeModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Branch *</label>
+                <select
+                  value={employeeForm.branch_id}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, branch_id: e.target.value })}
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+                >
+                  <option value="">Select Branch</option>
+                  {branchesList.map(b => (
+                    <option key={b.id} value={b.id}>{b.branch_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Role *</label>
+                <select
+                  value={employeeForm.role}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, role: e.target.value })}
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+                >
+                  <option value="TELECALLER">Telecaller</option>
+                  <option value="RM">RM (Relationship Manager)</option>
+                  <option value="EXECUTIVE">Executive</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Name *</label>
+                <input
+                  type="text"
+                  value={employeeForm.name}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })}
+                  placeholder="Employee Name"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mobile *</label>
+                <input
+                  type="text"
+                  value={employeeForm.mobile}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, mobile: e.target.value })}
+                  placeholder="Mobile Number"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Email *</label>
+                <input
+                  type="email"
+                  value={employeeForm.email}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
+                  placeholder="Email Address"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Password {employeeForm.id ? '(Leave blank to keep current)' : '*'}</label>
+                <input
+                  type="password"
+                  value={employeeForm.password}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
+                  placeholder="Password"
+                  className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <button
+                onClick={() => setIsEmployeeModalOpen(false)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEmployee}
+                className="w-full py-2.5 bg-[#4d0711] hover:bg-[#2e040a] text-amber-400 font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                {employeeForm.id ? 'Save Changes' : 'Create Employee'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RM APPROVAL MODALS */}
+      {actionType && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto flex flex-col gap-4 shadow-2xl relative">
+            <button
+              onClick={() => setActionType(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-800 cursor-pointer"
             >
-              <option value="">Select Branch</option>
-              {branchesList.map(b => (
-                <option key={b.id} value={b.id}>{b.branch_name}</option>
-              ))}
-            </select>
-          </div>
+              ✕
+            </button>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Role *</label>
-            <select
-              value={employeeForm.role}
-              onChange={(e) => setEmployeeForm({ ...employeeForm, role: e.target.value })}
-              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
-            >
-              <option value="TELECALLER">Telecaller</option>
-              <option value="RM">RM (Relationship Manager)</option>
-              <option value="EXECUTIVE">Executive</option>
-            </select>
-          </div>
+            {actionType === 'approve' && (
+              <>
+                <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Approve Lead Verification</h3>
+                <p className="text-xs text-slate-400">Provide final remarks for RM approval to enable executive field assignment.</p>
+                
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Approval Notes</label>
+                    <input
+                      type="text"
+                      value={approvalNotes}
+                      onChange={(e) => setApprovalNotes(e.target.value)}
+                      placeholder="e.g. Valuation verified, files clear."
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Remarks</label>
+                    <textarea
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      placeholder="Add any additional details here..."
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 h-24 resize-none focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Name *</label>
-            <input
-              type="text"
-              value={employeeForm.name}
-              onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })}
-              placeholder="Employee Name"
-              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
-            />
-          </div>
+                <div className="flex justify-end gap-3 mt-2">
+                  <button
+                    onClick={() => setActionType(null)}
+                    className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-450 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleApproveLead}
+                    className="px-4 py-2 text-xs font-bold bg-[#4d0711] text-amber-450 hover:bg-[#2e040a] rounded-xl shadow-md h-9 cursor-pointer transition-all active:scale-95"
+                  >
+                    Confirm Approval
+                  </button>
+                </div>
+              </>
+            )}
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mobile *</label>
-            <input
-              type="text"
-              value={employeeForm.mobile}
-              onChange={(e) => setEmployeeForm({ ...employeeForm, mobile: e.target.value })}
-              placeholder="Mobile Number"
-              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
-            />
-          </div>
+            {actionType === 'reverify' && (
+              <>
+                <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Send for Re-Verification</h3>
+                <p className="text-xs text-slate-400">Describe what details need to be verified. The lead will return to the Telecaller queue.</p>
+                
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Verification Issue Reason</label>
+                    <select
+                      value={reverifyReason}
+                      onChange={(e) => setReverifyReason(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="Missing Gold Weight Slip">Missing Gold Weight Slip</option>
+                      <option value="Unclear KYC Document">Unclear KYC Document</option>
+                      <option value="Loan Account Discrepancy">Loan Account Discrepancy</option>
+                      <option value="Incorrect Customer Phone">Incorrect Customer Phone</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Required Information</label>
+                    <input
+                      type="text"
+                      value={reverifyReqInfo}
+                      onChange={(e) => setReverifyReqInfo(e.target.value)}
+                      placeholder="e.g. Upload clear bank release statement"
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Remarks</label>
+                    <textarea
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      placeholder="Add instructions for Telecaller..."
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 h-20 resize-none focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Email *</label>
-            <input
-              type="email"
-              value={employeeForm.email}
-              onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
-              placeholder="Email Address"
-              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
-            />
-          </div>
+                <div className="flex justify-end gap-3 mt-2">
+                  <button
+                    onClick={() => setActionType(null)}
+                    className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-450 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReverifyLead}
+                    className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md h-9 cursor-pointer transition-all active:scale-95"
+                  >
+                    Send Back
+                  </button>
+                </div>
+              </>
+            )}
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Password {employeeForm.id ? '(Leave blank to keep current)' : '*'}</label>
-            <input
-              type="password"
-              value={employeeForm.password}
-              onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
-              placeholder="Password"
-              className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
-            />
+            {actionType === 'reject' && (
+              <>
+                <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Reject Lead Case</h3>
+                <p className="text-xs text-slate-400">Provide the rejection reason. This terminates the lead in the workflow.</p>
+                
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Rejection Reason</label>
+                    <select
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="Purity discrepancy">Gold purity discrepancy</option>
+                      <option value="Invalid loan details">Invalid loan details</option>
+                      <option value="Customer backed out">Customer backed out</option>
+                      <option value="Branch restrictions">Branch restrictions</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Additional Remarks</label>
+                    <textarea
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      placeholder="Add details about rejection decision..."
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 h-24 resize-none focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-2">
+                  <button
+                    onClick={() => setActionType(null)}
+                    className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-450 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRejectLead}
+                    className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-md h-9 cursor-pointer transition-all active:scale-95"
+                  >
+                    Confirm Rejection
+                  </button>
+                </div>
+              </>
+            )}
+
+            {actionType === 'assign' && (
+              <>
+                <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Assign Field Executive</h3>
+                <p className="text-xs text-slate-400">Select an active executive to handle bank gold release and payout verification.</p>
+                
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Select Executive</label>
+                    <select
+                      value={selectedExecutiveId}
+                      onChange={(e) => setSelectedExecutiveId(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="">Select an Executive...</option>
+                      {employeesList
+                        .filter(emp => emp.role === 'EXECUTIVE' && emp.status === 'active')
+                        .map(ex => (
+                          <option key={ex.id} value={ex.id}>{ex.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-4">
+                  <button
+                    onClick={() => setActionType(null)}
+                    className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-450 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleAssignExecutive(selectedLeadId || '', selectedExecutiveId)}
+                    disabled={!selectedExecutiveId}
+                    className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-755 text-white disabled:opacity-50 disabled:pointer-events-none rounded-xl shadow-md h-9 cursor-pointer transition-all active:scale-95"
+                  >
+                    Confirm Assignment
+                  </button>
+                </div>
+              </>
+            )}
+
           </div>
         </div>
+      )}
 
-        <div className="grid grid-cols-2 gap-3 mt-2">
-          <button
-            onClick={() => setIsEmployeeModalOpen(false)}
-            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSaveEmployee}
-            className="w-full py-2.5 bg-[#4d0711] hover:bg-[#2e040a] text-amber-400 font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
-          >
-            {employeeForm.id ? 'Save Changes' : 'Create Employee'}
-          </button>
-        </div>
-      </div>
     </div>
-  )}
-
-</div>
   );
 }

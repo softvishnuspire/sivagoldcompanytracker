@@ -68,6 +68,54 @@ export default function DocumentManager() {
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
+  const getFileUrl = async (item: DocumentItem): Promise<string> => {
+    if (item.url && !item.url.startsWith('PLACEHOLDER_')) {
+      return item.url;
+    }
+    
+    let category = 'document';
+    if (item.type === 'GOLD_IMAGE') {
+      category = 'gold';
+    } else if (item.type === 'PAYMENT_PROOF') {
+      category = 'payment';
+    }
+    
+    const token = localStorage.getItem('token') || localStorage.getItem('siva_token');
+    const res = await fetch(`${API_BASE}/documents/file/${category}/${item.id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (!res.ok) {
+      throw new Error('Failed to fetch file content');
+    }
+    const data = await res.json();
+    
+    // Update the URL in our leads state so we don't fetch it again
+    setLeads(prevLeads => prevLeads.map(lead => {
+      if (lead.id !== selectedLead?.id) return lead;
+      return {
+        ...lead,
+        lead_documents: (lead.lead_documents || []).map(d => d.id === item.id ? { ...d, file_url: data.url } : d),
+        gold_images: (lead.gold_images || []).map(g => g.id === item.id ? { ...g, image_url: data.url } : g),
+        payments: (lead.payments || []).map(p => p.id === item.id ? { ...p, payment_proof: data.url } : p)
+      };
+    }));
+    
+    // Update selected lead too
+    setSelectedLead(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        lead_documents: (prev.lead_documents || []).map(d => d.id === item.id ? { ...d, file_url: data.url } : d),
+        gold_images: (prev.gold_images || []).map(g => g.id === item.id ? { ...g, image_url: data.url } : g),
+        payments: (prev.payments || []).map(p => p.id === item.id ? { ...p, payment_proof: data.url } : p)
+      };
+    });
+    
+    return data.url;
+  };
+
   useEffect(() => {
     async function fetchLeadsAndDocuments() {
       try {
@@ -200,6 +248,28 @@ export default function DocumentManager() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handlePreviewClick = async (doc: DocumentItem) => {
+    try {
+      const url = await getFileUrl(doc);
+      setPreviewUrl(url);
+      setPreviewType(doc.type);
+      setPreviewName(doc.name);
+    } catch (err) {
+      console.error('Preview error:', err);
+      alert('Failed to load file preview.');
+    }
+  };
+
+  const handleDownloadClick = async (doc: DocumentItem) => {
+    try {
+      const url = await getFileUrl(doc);
+      handleDownload(url, `${selectedLead?.customer_name || 'document'}_${doc.type}`);
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download file.');
+    }
   };
 
   const formatStatus = (status: string) => {
@@ -416,17 +486,13 @@ export default function DocumentManager() {
 
                           <div className="pt-3 mt-4 border-t border-slate-200/60 flex items-center justify-end gap-2">
                             <button
-                              onClick={() => {
-                                setPreviewUrl(doc.url);
-                                setPreviewType(doc.type);
-                                setPreviewName(doc.name);
-                              }}
+                              onClick={() => handlePreviewClick(doc)}
                               className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-[#c3902c] rounded-lg text-[10px] font-mono tracking-wider cursor-pointer transition-colors"
                             >
                               PREVIEW
                             </button>
                             <button
-                              onClick={() => handleDownload(doc.url, `${selectedLead.customer_name}_${doc.type}`)}
+                              onClick={() => handleDownloadClick(doc)}
                               className="px-2.5 py-1 bg-gradient-to-r from-amber-600 to-amber-500 text-white rounded-lg text-[10px] font-bold cursor-pointer hover:brightness-110 transition-all"
                             >
                               DOWNLOAD

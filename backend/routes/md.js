@@ -27,7 +27,7 @@ router.get('/dashboard', async (req, res) => {
 
     const [leadsRes, goldRes, payRes] = await Promise.all([
       supabase.from('leads').select('id, current_status'),
-      supabase.from('gold_collection').select('net_weight, created_at').gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString()),
+      supabase.from('gold_collection').select('net_weight, created_at, lead:lead_id(gold_type)').gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString()),
       supabase.from('payments').select('total_paid, created_at').gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString())
     ]);
 
@@ -55,6 +55,52 @@ router.get('/dashboard', async (req, res) => {
 
     const conversionRate = totalLeads > 0 ? Number(((completedCases / totalLeads) * 100).toFixed(2)) : 0;
 
+    // Calculate purity breakdown
+    const purityTotals = {
+      '24K': 0,
+      '22K': 0,
+      '20K': 0,
+      '18K': 0
+    };
+
+    const collections = goldRes.data || [];
+    collections.forEach(item => {
+      const goldType = item.lead?.gold_type;
+      if (goldType) {
+        // Matches e.g. "24K (10g)" or "22K (20.5g)" or "20K (15.5 g)"
+        const regex = /(\d+K)\s*\(?\s*([0-9.]+)\s*g?\s*\)?/gi;
+        let match;
+        let foundAny = false;
+        while ((match = regex.exec(goldType)) !== null) {
+          const purity = match[1].toUpperCase();
+          const weight = parseFloat(match[2]);
+          if (purity in purityTotals && !isNaN(weight)) {
+            purityTotals[purity] += weight;
+            foundAny = true;
+          }
+        }
+        // Fallback for old format
+        if (!foundAny) {
+          const purities = goldType.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+          if (purities.length === 1 && purities[0] in purityTotals) {
+            purityTotals[purities[0]] += Number(item.net_weight || 0);
+          }
+        }
+      } else {
+        // Fallback default
+        purityTotals['22K'] += Number(item.net_weight || 0);
+      }
+    });
+
+    const breakdownParts = [];
+    const order = ['24K', '22K', '20K', '18K'];
+    order.forEach(p => {
+      if (purityTotals[p] > 0) {
+        breakdownParts.push(`${p} - ${purityTotals[p].toFixed(2)} gm`);
+      }
+    });
+    const goldCollectedTodayBreakdown = breakdownParts.join(', ');
+
     res.json({
       totalLeads,
       qualifiedLeads,
@@ -62,6 +108,7 @@ router.get('/dashboard', async (req, res) => {
       activeCases,
       completedCases,
       goldCollectedToday,
+      goldCollectedTodayBreakdown,
       revenueToday,
       conversionRate
     });
@@ -1210,6 +1257,87 @@ router.get('/expenses', async (req, res) => {
       logs: formattedLogs
     });
 
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/md/lead-sources - Get all lead sources
+router.get('/lead-sources', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('lead_sources')
+      .select('*')
+      .order('source_name', { ascending: true });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/md/lead-sources - Create a new lead source
+router.post('/lead-sources', async (req, res) => {
+  try {
+    const { source_name } = req.body;
+    if (!source_name || !source_name.trim()) {
+      return res.status(400).json({ error: 'Source name is required.' });
+    }
+
+    const trimmedName = source_name.trim();
+
+    // Check if exists
+    const { data: existing, error: existError } = await supabase
+      .from('lead_sources')
+      .select('id, status')
+      .eq('source_name', trimmedName)
+      .maybeSingle();
+
+    if (existError) throw existError;
+
+    if (existing) {
+      if (existing.status === 'active') {
+        return res.status(400).json({ error: 'This lead source already exists.' });
+      } else {
+        // Reactivate it
+        const { data: updated, error: updateError } = await supabase
+          .from('lead_sources')
+          .update({ status: 'active' })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (updateError) throw updateError;
+        return res.json(updated);
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('lead_sources')
+      .insert([{ source_name: trimmedName, status: 'active' }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/md/lead-sources/:id - Deactivate a lead source
+router.delete('/lead-sources/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from('lead_sources')
+      .update({ status: 'inactive' })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
