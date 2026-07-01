@@ -23,6 +23,10 @@ import {
   Legend
 } from 'recharts';
 
+const sanitizeMathExpression = (val: string): string => {
+  return val.replace(/[^0-9.+-/*()xX\u00d7%]/g, '');
+};
+
 // =========================================================================
 // TYPES & INTERFACES
 // =========================================================================
@@ -3022,10 +3026,10 @@ export default function MDDashboard() {
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Approved Amount (₹)</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={approvedAmountInput}
-                    max={activeFundRequest.requested_amount}
-                    onChange={(e) => setApprovedAmountInput(e.target.value)}
+                    onChange={(e) => setApprovedAmountInput(sanitizeMathExpression(e.target.value))}
                     className="border border-slate-200 bg-slate-50/50 rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-500"
                   />
                   <span className="text-[9px] text-slate-400">Must be less than or equal to ₹{activeFundRequest.requested_amount.toLocaleString('en-IN')}</span>
@@ -3213,8 +3217,10 @@ export default function MDDashboard() {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mobile *</label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={employeeForm.mobile}
-                  onChange={(e) => setEmployeeForm({ ...employeeForm, mobile: e.target.value })}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, mobile: e.target.value.replace(/[^0-9]/g, '').slice(0, 10) })}
                   placeholder="Mobile Number"
                   className="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
                 />

@@ -6,6 +6,9 @@ import { apiRequest } from '../../../../lib/api';
 import { toast } from 'sonner';
 import { TableSkeleton } from '../../../../components/ui/SkeletonLoaders';
 
+const sanitizeMathExpression = (val: string): string => {
+  return val.replace(/[^0-9.+-/*()xX\u00d7%]/g, '');
+};
 
 interface TimelineEvent {
   id: string;
@@ -802,10 +805,11 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                           <div>
                             <label className="block text-[10px] font-bold tracking-wider text-slate-450 mb-1.5 uppercase">Requested Amount (₹)</label>
                             <input 
-                              type="number"
+                              type="text"
+                              inputMode="decimal"
                               placeholder="Enter amount (e.g. 75000)"
                               value={requestedAmount}
-                              onChange={(e) => setRequestedAmount(e.target.value)}
+                              onChange={(e) => setRequestedAmount(sanitizeMathExpression(e.target.value))}
                               className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs font-mono focus:outline-none focus:border-amber-500/50"
                             />
                           </div>
@@ -1090,10 +1094,11 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Loan Amount Paid (₹)</label>
                       <input 
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="e.g. 50000"
                         value={loanAmountPaid}
-                        onChange={(e) => setLoanAmountPaid(e.target.value)}
+                        onChange={(e) => setLoanAmountPaid(sanitizeMathExpression(e.target.value))}
                         className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 text-xs font-mono"
                       />
                     </div>
@@ -1166,20 +1171,22 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                     <div>
                       <label className="block text-slate-550 mb-2 uppercase text-[10px] font-bold">Gross Weight (g)</label>
                       <input 
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="e.g. 24.5"
                         value={grossWeight}
-                        onChange={(e) => setGrossWeight(e.target.value)}
+                        onChange={(e) => setGrossWeight(sanitizeMathExpression(e.target.value))}
                         className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 text-xs font-mono"
                       />
                     </div>
                     <div>
                       <label className="block text-slate-550 mb-2 uppercase text-[10px] font-bold">Net Weight (g)</label>
                       <input 
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="e.g. 23.1"
                         value={netWeight}
-                        onChange={(e) => setNetWeight(e.target.value)}
+                        onChange={(e) => setNetWeight(sanitizeMathExpression(e.target.value))}
                         className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 text-xs font-mono"
                       />
                     </div>
@@ -1229,10 +1236,11 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Balance (₹)</label>
                       <input 
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Balance paid"
                         value={balanceAmount}
-                        onChange={(e) => setBalanceAmount(e.target.value)}
+                        onChange={(e) => setBalanceAmount(sanitizeMathExpression(e.target.value))}
                         className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 text-xs font-mono"
                       />
                     </div>
@@ -1376,10 +1384,11 @@ export default function LeadDetailsPage({ params }: { params: Promise<{ id: stri
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Total Visit / Travel Expenses (₹)</label>
                       <input 
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="e.g. 450"
                         value={expenseAmount}
-                        onChange={(e) => setExpenseAmount(e.target.value)}
+                        onChange={(e) => setExpenseAmount(sanitizeMathExpression(e.target.value))}
                         className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-850 text-xs font-mono"
                       />
                       <span className="text-[10px] text-slate-400 block mt-1">Provide total travel/fuel/other conveyance expenses for this case closure.</span>

@@ -14,6 +14,10 @@ import { Lead, Document } from '../types';
 import FileUploader from '../../../components/ui/FileUploader';
 import Button from '../../../components/ui/Button';
 
+const sanitizeMathExpression = (val: string): string => {
+  return val.replace(/[^0-9.+-/*()xX\u00d7%]/g, '');
+};
+
 interface LeadFormProps {
   onSave: (lead: Omit<Lead, 'id' | 'leadNumber' | 'createdAt' | 'updatedAt'> & { id?: string }) => void | Promise<void>;
   editingLead?: Lead | null;
@@ -192,7 +196,8 @@ export default function LeadForm({ onSave, editingLead, onCancel, leadSources = 
   };
 
   const handleWeightChange = (purity: string, value: string) => {
-    const nextWeights = { ...purityWeights, [purity]: value };
+    const cleanValue = sanitizeMathExpression(value);
+    const nextWeights = { ...purityWeights, [purity]: cleanValue };
     setPurityWeights(nextWeights);
     updateGoldFormData(selectedPurities, nextWeights, purityEstimatedValues);
 
@@ -210,7 +215,8 @@ export default function LeadForm({ onSave, editingLead, onCancel, leadSources = 
   };
 
   const handleEstimateChange = (purity: string, value: string) => {
-    const nextEstimates = { ...purityEstimatedValues, [purity]: value };
+    const cleanValue = sanitizeMathExpression(value);
+    const nextEstimates = { ...purityEstimatedValues, [purity]: cleanValue };
     setPurityEstimatedValues(nextEstimates);
     updateGoldFormData(selectedPurities, purityWeights, nextEstimates);
 
@@ -320,7 +326,15 @@ export default function LeadForm({ onSave, editingLead, onCancel, leadSources = 
   }, [editingLead]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let value = e.target.value;
+
+    if (name === 'mobile' || name === 'alternateMobile') {
+      value = value.replace(/[^0-9]/g, '').slice(0, 10);
+    } else if (name === 'loanAmount') {
+      value = sanitizeMathExpression(value);
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
     if (formStatus === "Not Started") {
       setFormStatus("In Progress");
@@ -683,6 +697,7 @@ export default function LeadForm({ onSave, editingLead, onCancel, leadSources = 
                 <input
                   type="text"
                   name="mobile"
+                  inputMode="numeric"
                   maxLength={10}
                   disabled={isSubmitting}
                   value={formData.mobile}
@@ -706,6 +721,7 @@ export default function LeadForm({ onSave, editingLead, onCancel, leadSources = 
                 <input
                   type="text"
                   name="alternateMobile"
+                  inputMode="numeric"
                   maxLength={10}
                   disabled={isSubmitting}
                   value={formData.alternateMobile}
@@ -788,8 +804,7 @@ export default function LeadForm({ onSave, editingLead, onCancel, leadSources = 
                   Gold Weight (Grams) *
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
                   name="goldWeight"
                   readOnly
                   disabled={isSubmitting}
@@ -850,8 +865,8 @@ export default function LeadForm({ onSave, editingLead, onCancel, leadSources = 
                             {purity} Gold Weight (Grams) *
                           </label>
                           <input
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             disabled={isSubmitting}
                             value={purityWeights[purity] || ''}
                             onChange={(e) => handleWeightChange(purity, e.target.value)}
@@ -872,7 +887,8 @@ export default function LeadForm({ onSave, editingLead, onCancel, leadSources = 
                             {purity} Estimated Value (₹) *
                           </label>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             disabled={isSubmitting}
                             value={purityEstimatedValues[purity] || ''}
                             onChange={(e) => handleEstimateChange(purity, e.target.value)}
@@ -952,8 +968,9 @@ export default function LeadForm({ onSave, editingLead, onCancel, leadSources = 
                   Loan Amount Pledged (₹) *
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   name="loanAmount"
+                  inputMode="decimal"
                   disabled={isSubmitting}
                   value={formData.loanAmount}
                   onChange={handleInputChange}
